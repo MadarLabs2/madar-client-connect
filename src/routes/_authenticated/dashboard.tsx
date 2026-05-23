@@ -85,8 +85,10 @@ function ClientDashboard() {
                     </Button>
                   )}
                   {p.cmsUrl && (
-                    <Button size="sm">
-                      <Settings2 className="mr-1.5 h-3.5 w-3.5" /> Manage content
+                    <Button asChild size="sm">
+                      <a href={p.cmsUrl} target="_blank" rel="noreferrer">
+                        <Settings2 className="mr-1.5 h-3.5 w-3.5" /> Manage content
+                      </a>
                     </Button>
                   )}
                 </div>
