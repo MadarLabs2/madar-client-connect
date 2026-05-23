@@ -1,11 +1,11 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/external-db/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ExternalLink, Settings2 } from "lucide-react";
+import { ExternalLink, Settings2, LayoutDashboard } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: ClientDashboard,
@@ -69,24 +69,27 @@ function ClientDashboard() {
                     <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${p.progress}%` }} />
                   </div>
                 </div>
-                {(p.live_url || p.cms_url) && (
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {p.live_url && (
-                      <Button asChild size="sm" variant="outline">
-                        <a href={p.live_url} target="_blank" rel="noreferrer">
-                          <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> View live
-                        </a>
-                      </Button>
-                    )}
-                    {p.cms_url && (
-                      <Button asChild size="sm">
-                        <a href={p.cms_url} target="_blank" rel="noreferrer">
-                          <Settings2 className="mr-1.5 h-3.5 w-3.5" /> Manage content
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-                )}
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Button asChild size="sm">
+                    <Link to="/dashboard/manage/$projectId" params={{ projectId: p.id }} search={{ tab: "overview" }}>
+                      <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" /> לוח ניהול
+                    </Link>
+                  </Button>
+                  {p.live_url && (
+                    <Button asChild size="sm" variant="outline">
+                      <a href={p.live_url} target="_blank" rel="noreferrer">
+                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> צפייה
+                      </a>
+                    </Button>
+                  )}
+                  {p.cms_url && (
+                    <Button asChild size="sm" variant="outline">
+                      <a href={p.cms_url} target="_blank" rel="noreferrer">
+                        <Settings2 className="mr-1.5 h-3.5 w-3.5" /> CMS חיצוני
+                      </a>
+                    </Button>
+                  )}
+                </div>
               </Card>
             ))}
           </div>
