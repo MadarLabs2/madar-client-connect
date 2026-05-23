@@ -22,7 +22,7 @@ export const projectList = createServerFn({ method: "POST" })
     z.object({
       projectId: z.string().uuid(),
       table: TableSchema,
-      limit: z.number().int().min(1).max(500).default(200),
+      limit: z.coerce.number().int().min(1).optional().default(200).transform((limit) => Math.min(limit, 500)),
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
