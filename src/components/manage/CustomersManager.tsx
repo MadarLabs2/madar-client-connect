@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   projectList,
@@ -18,7 +19,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Search, Eye, Trash2, Ban, CheckCircle2 } from "lucide-react";
+import { Search, Eye, Trash2, Ban, CheckCircle2, ShoppingCart } from "lucide-react";
 
 type CustomerRow = {
   id: string;
