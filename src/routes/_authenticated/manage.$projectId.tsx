@@ -9,6 +9,7 @@ import {
   projectInsert,
   projectUpdate,
   projectDelete,
+  projectUploadImage,
 } from "@/lib/project-db.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Upload,
 } from "lucide-react";
 
 const searchSchema = z.object({
@@ -214,6 +216,45 @@ function ResourceTable({ projectId, table, label }: { projectId: string; table: 
   const insertFn = useServerFn(projectInsert);
   const updateFn = useServerFn(projectUpdate);
   const deleteFn = useServerFn(projectDelete);
+  const uploadFn = useServerFn(projectUploadImage);
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      let bin = "";
+      const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      const dataBase64 = btoa(bin);
+      const res = await uploadFn({
+        data: {
+          projectId,
+          fileName: file.name,
+          contentType: file.type || "image/jpeg",
+          dataBase64,
+        },
+      });
+      // Insert URL into the JSON editor
+      setEditing((s) => {
+        if (!s) return s;
+        try {
+          const obj = JSON.parse(s.json || "{}");
+          const target = obj.data && typeof obj.data === "object" ? obj.data : obj;
+          target.image_url = res.url;
+          if (target !== obj && !obj.data) obj.data = target;
+          return { ...s, json: JSON.stringify(obj, null, 2) };
+        } catch {
+          return { ...s, json: JSON.stringify({ image_url: res.url }, null, 2) };
+        }
+      });
+      toast.success("התמונה הועלתה");
+    } catch (e: any) {
+      toast.error(e.message || "שגיאה בהעלאה");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ["pdb", projectId, table],
@@ -328,6 +369,26 @@ function ResourceTable({ projectId, table, label }: { projectId: string; table: 
           <DialogHeader>
             <DialogTitle>{editing?.id != null ? "עריכת רשומה" : "רשומה חדשה"}</DialogTitle>
           </DialogHeader>
+          <div className="flex items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs hover:bg-muted">
+              <Upload className="h-3.5 w-3.5" />
+              {uploading ? "מעלה…" : "העלאת תמונה"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleUpload(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <span className="text-[11px] text-muted-foreground">
+              התמונה תעלה ל-Storage של הפרויקט ותתווסף כ-image_url
+            </span>
+          </div>
           <Textarea
             className="min-h-[320px] font-mono text-xs"
             value={editing?.json ?? ""}

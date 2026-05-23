@@ -111,3 +111,33 @@ export const projectInfo = createServerFn({ method: "POST" })
       progress: project.progress,
     };
   });
+
+export const projectUploadImage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      projectId: z.string().uuid(),
+      fileName: z.string().min(1).max(255),
+      contentType: z.string().min(1).max(100),
+      dataBase64: z.string().min(1),
+      bucket: z.string().min(1).max(100).default("product-images"),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await isAdmin(context.userId);
+    const client = await getProjectClient(data.projectId, context.userId, admin);
+    const bytes = Uint8Array.from(atob(data.dataBase64), (c) => c.charCodeAt(0));
+    const ext = data.fileName.split(".").pop() || "jpg";
+    const safe = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+    // Ensure bucket exists (best-effort, ignore "already exists")
+    await client.storage.createBucket(data.bucket, { public: true }).catch(() => {});
+
+    const { error: upErr } = await client.storage
+      .from(data.bucket)
+      .upload(safe, bytes, { contentType: data.contentType, upsert: false });
+    if (upErr) throw new Error(upErr.message);
+
+    const { data: pub } = client.storage.from(data.bucket).getPublicUrl(safe);
+    return { url: pub.publicUrl, path: safe };
+  });
