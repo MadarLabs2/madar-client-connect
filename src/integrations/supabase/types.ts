@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      products: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company: string
@@ -48,6 +80,9 @@ export type Database = {
           name: string
           progress: number
           status: Database["public"]["Enums"]["project_status"]
+          supabase_anon_key: string | null
+          supabase_service_key: string | null
+          supabase_url: string | null
           type: Database["public"]["Enums"]["project_type"]
           updated_at: string
         }
@@ -60,6 +95,9 @@ export type Database = {
           name: string
           progress?: number
           status?: Database["public"]["Enums"]["project_status"]
+          supabase_anon_key?: string | null
+          supabase_service_key?: string | null
+          supabase_url?: string | null
           type?: Database["public"]["Enums"]["project_type"]
           updated_at?: string
         }
@@ -72,6 +110,9 @@ export type Database = {
           name?: string
           progress?: number
           status?: Database["public"]["Enums"]["project_status"]
+          supabase_anon_key?: string | null
+          supabase_service_key?: string | null
+          supabase_url?: string | null
           type?: Database["public"]["Enums"]["project_type"]
           updated_at?: string
         }
