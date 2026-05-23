@@ -124,23 +124,6 @@ function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            {mode === "signin" ? (
-              <>
-                No account yet?{" "}
-                <button className="font-medium text-foreground hover:underline" onClick={() => setMode("signup")}>
-                  Create one
-                </button>
-              </>
-            ) : (
-              <>
-                Already have an account?{" "}
-                <button className="font-medium text-foreground hover:underline" onClick={() => setMode("signin")}>
-                  Sign in
-                </button>
-              </>
-            )}
-          </div>
         </div>
       </div>
     </div>
