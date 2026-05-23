@@ -71,7 +71,7 @@ function ClientDashboard() {
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Button asChild size="sm">
-                    <Link to="/dashboard/manage/$projectId" params={{ projectId: p.id }} search={{ tab: "overview" }}>
+                    <Link to="/manage/$projectId" params={{ projectId: p.id }} search={{ tab: "overview" }}>
                       <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" /> לוח ניהול
                     </Link>
                   </Button>

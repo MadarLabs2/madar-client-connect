@@ -42,7 +42,7 @@ const searchSchema = z.object({
     .default("overview"),
 });
 
-export const Route = createFileRoute("/_authenticated/dashboard/manage/$projectId")({
+export const Route = createFileRoute("/_authenticated/manage/$projectId")({
   validateSearch: (s) => searchSchema.parse(s),
   component: ManageProject,
 });
