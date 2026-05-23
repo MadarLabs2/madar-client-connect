@@ -143,6 +143,8 @@ function ManageProject() {
           <CouponsManager projectId={projectId} />
         ) : activeTab.id === "notifications" ? (
           <NotificationsManager projectId={projectId} />
+        ) : activeTab.id === "settings" ? (
+          <SettingsManager projectId={projectId} />
         ) : (
           <ResourceTable projectId={projectId} table={activeTab.table!} label={activeTab.label} />
         )}
