@@ -246,6 +246,12 @@ export function CustomersManager({ projectId }: { projectId: string }) {
             </DialogTitle>
           </DialogHeader>
 
+          {selected?.is_blocked && (
+            <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              חסום — המשתמש לא יכול להתחבר
+            </div>
+          )}
+
           {selected && (
             <div className="space-y-4">
               <Card className="p-3 text-sm space-y-1">
