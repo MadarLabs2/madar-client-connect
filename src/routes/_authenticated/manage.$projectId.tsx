@@ -137,6 +137,8 @@ function ManageProject() {
           <OrdersManager projectId={projectId} />
         ) : activeTab.id === "customers" ? (
           <CustomersManager projectId={projectId} />
+        ) : activeTab.id === "coupons" ? (
+          <CouponsManager projectId={projectId} />
         ) : (
           <ResourceTable projectId={projectId} table={activeTab.table!} label={activeTab.label} />
         )}
