@@ -369,6 +369,26 @@ function ResourceTable({ projectId, table, label }: { projectId: string; table: 
           <DialogHeader>
             <DialogTitle>{editing?.id != null ? "עריכת רשומה" : "רשומה חדשה"}</DialogTitle>
           </DialogHeader>
+          <div className="flex items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs hover:bg-muted">
+              <Upload className="h-3.5 w-3.5" />
+              {uploading ? "מעלה…" : "העלאת תמונה"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleUpload(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <span className="text-[11px] text-muted-foreground">
+              התמונה תעלה ל-Storage של הפרויקט ותתווסף כ-image_url
+            </span>
+          </div>
           <Textarea
             className="min-h-[320px] font-mono text-xs"
             value={editing?.json ?? ""}
