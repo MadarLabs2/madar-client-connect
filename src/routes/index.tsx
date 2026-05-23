@@ -6,9 +6,9 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { user, hydrated } = useAuth();
+  const { user, hydrated, role } = useAuth();
   if (!hydrated) return <div className="min-h-screen bg-background" />;
   if (!user) return <Navigate to="/login" />;
-  if (user.role === "admin") return <Navigate to="/admin" />;
-  return <Navigate to="/dashboard" />;
+  if (!role) return <div className="min-h-screen bg-background" />;
+  return <Navigate to={role === "admin" ? "/admin" : "/dashboard"} />;
 }

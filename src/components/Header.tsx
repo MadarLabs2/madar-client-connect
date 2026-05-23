@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
 export function Header() {
-  const { user, logout } = useAuth();
+  const { user, profile, role, signOut } = useAuth();
   const nav = useNavigate();
 
   return (
@@ -16,13 +16,13 @@ export function Header() {
           {user ? (
             <>
               <span className="hidden text-sm text-muted-foreground sm:inline">
-                {user.name} · <span className="capitalize">{user.role}</span>
+                {profile?.name || user.email} · <span className="capitalize">{role}</span>
               </span>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  logout();
+                onClick={async () => {
+                  await signOut();
                   nav({ to: "/login" });
                 }}
               >

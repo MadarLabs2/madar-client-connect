@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,44 +11,43 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { login, user } = useAuth();
+  const { signIn, signUp, user, role, hydrated } = useAuth();
   const nav = useNavigate();
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [company, setCompany] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (user) {
-    nav({ to: user.role === "admin" ? "/admin" : "/dashboard" });
-  }
-
-  function quickFill(role: "admin" | "client") {
-    if (role === "admin") {
-      setEmail("admin@madar.com");
-      setPassword("admin123");
-    } else {
-      setEmail("client@acme.com");
-      setPassword("client123");
+  useEffect(() => {
+    if (hydrated && user && role) {
+      nav({ to: role === "admin" ? "/admin" : "/dashboard" });
     }
-  }
+  }, [hydrated, user, role, nav]);
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const res = login(email, password);
+    const res =
+      mode === "signin"
+        ? await signIn(email, password)
+        : await signUp({ email, password, name, company });
     setBusy(false);
     if (!res.ok) {
       toast.error(res.error);
       return;
     }
-    toast.success("Welcome back");
-    // Re-read user via storage to route correctly
-    const stored = JSON.parse(localStorage.getItem("madar.session.v1") || "null");
-    nav({ to: stored?.role === "admin" ? "/admin" : "/dashboard" });
+    if (mode === "signup") {
+      toast.success("Account created. Signing you in…");
+      await signIn(email, password);
+    } else {
+      toast.success("Welcome back");
+    }
   }
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      {/* Brand panel */}
       <div className="relative hidden flex-col justify-between overflow-hidden bg-primary p-12 text-primary-foreground lg:flex">
         <div className="font-display text-3xl tracking-tight">Madar</div>
         <div className="relative">
@@ -68,18 +67,33 @@ function LoginPage() {
         />
       </div>
 
-      {/* Form panel */}
       <div className="flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           <div className="mb-8 lg:hidden">
             <div className="font-display text-3xl tracking-tight">Madar</div>
           </div>
-          <h2 className="font-display text-3xl tracking-tight">Sign in</h2>
+          <h2 className="font-display text-3xl tracking-tight">
+            {mode === "signin" ? "Sign in" : "Create account"}
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Access your client portal.
+            {mode === "signin"
+              ? "Access your client portal."
+              : "The first account becomes the admin."}
           </p>
 
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
+            {mode === "signup" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="name">Full name</Label>
+                  <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="company">Company</Label>
+                  <Input id="company" required value={company} onChange={(e) => setCompany(e.target.value)} />
+                </div>
+              </>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -97,33 +111,35 @@ function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
                 required
+                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="At least 8 characters"
               />
             </div>
             <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "Signing in…" : "Sign in"}
+              {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
             </Button>
           </form>
 
-          <div className="mt-6 rounded-lg border border-border bg-card p-4">
-            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Demo accounts
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => quickFill("admin")}>
-                Use Admin
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => quickFill("client")}>
-                Use Client
-              </Button>
-            </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              admin@madar.com / admin123 · client@acme.com / client123
-            </p>
+          <div className="mt-6 text-center text-sm text-muted-foreground">
+            {mode === "signin" ? (
+              <>
+                No account yet?{" "}
+                <button className="font-medium text-foreground hover:underline" onClick={() => setMode("signup")}>
+                  Create one
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{" "}
+                <button className="font-medium text-foreground hover:underline" onClick={() => setMode("signin")}>
+                  Sign in
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
