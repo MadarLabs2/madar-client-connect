@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -10,28 +10,17 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 
 type SettingsForm = {
   contact_phone_display: string;
-  contact_email: string;
-  contact_address: string;
   shipping_home_flat_nis: string;
   shipping_free_above_subtotal_nis: string;
-  facebook_url: string;
-  instagram_url: string;
-  whatsapp_number: string;
 };
 
 const EMPTY: SettingsForm = {
   contact_phone_display: "",
-  contact_email: "",
-  contact_address: "",
   shipping_home_flat_nis: "0",
   shipping_free_above_subtotal_nis: "0",
-  facebook_url: "",
-  instagram_url: "",
-  whatsapp_number: "",
 };
 
 function isValidPhone(p: string) {
@@ -63,13 +52,8 @@ export function SettingsManager({ projectId }: { projectId: string }) {
     }
     setForm({
       contact_phone_display: String(current.contact_phone_display ?? ""),
-      contact_email: String(current.contact_email ?? ""),
-      contact_address: String(current.contact_address ?? ""),
       shipping_home_flat_nis: String(current.shipping_home_flat_nis ?? 0),
       shipping_free_above_subtotal_nis: String(current.shipping_free_above_subtotal_nis ?? 0),
-      facebook_url: String(current.facebook_url ?? ""),
-      instagram_url: String(current.instagram_url ?? ""),
-      whatsapp_number: String(current.whatsapp_number ?? ""),
     });
   }, [current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -79,10 +63,6 @@ export function SettingsManager({ projectId }: { projectId: string }) {
   const validate = (): boolean => {
     if (form.contact_phone_display.trim() && !isValidPhone(form.contact_phone_display)) {
       toast.error("מספר טלפון לא תקין (9–15 ספרות)");
-      return false;
-    }
-    if (form.contact_email.trim() && !/^\S+@\S+\.\S+$/.test(form.contact_email)) {
-      toast.error("אימייל לא תקין");
       return false;
     }
     const flat = Number(form.shipping_home_flat_nis);
@@ -104,13 +84,8 @@ export function SettingsManager({ projectId }: { projectId: string }) {
     try {
       const row = {
         contact_phone_display: form.contact_phone_display.trim(),
-        contact_email: form.contact_email.trim(),
-        contact_address: form.contact_address.trim(),
         shipping_home_flat_nis: Number(form.shipping_home_flat_nis),
         shipping_free_above_subtotal_nis: Number(form.shipping_free_above_subtotal_nis),
-        facebook_url: form.facebook_url.trim(),
-        instagram_url: form.instagram_url.trim(),
-        whatsapp_number: form.whatsapp_number.trim(),
       };
       if (current?.id != null) {
         await updateFn({
@@ -137,7 +112,7 @@ export function SettingsManager({ projectId }: { projectId: string }) {
       <div>
         <h1 className="font-display text-3xl">הגדרות אתר</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          פרטי קשר, משלוחים ורשתות חברתיות. נשמר בטבלת <code>site_settings</code>.
+          מספר טלפון והגדרות משלוח. נשמר בטבלת <code>site_settings</code>.
         </p>
       </div>
 
@@ -149,29 +124,14 @@ export function SettingsManager({ projectId }: { projectId: string }) {
       )}
 
       <Card className="p-5">
-        <h2 className="font-display text-xl">פרטי קשר</h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <h2 className="font-display text-xl">מספר טלפון</h2>
+        <div className="mt-4">
           <Field label="מספר טלפון">
             <Input
               value={form.contact_phone_display}
               onChange={(e) => update("contact_phone_display", e.target.value)}
               autoComplete="tel"
               dir="ltr"
-            />
-          </Field>
-          <Field label="אימייל">
-            <Input
-              type="email"
-              value={form.contact_email}
-              onChange={(e) => update("contact_email", e.target.value)}
-              dir="ltr"
-            />
-          </Field>
-          <Field label="כתובת" className="md:col-span-2">
-            <Textarea
-              value={form.contact_address}
-              onChange={(e) => update("contact_address", e.target.value)}
-              rows={2}
             />
           </Field>
         </div>
@@ -194,34 +154,6 @@ export function SettingsManager({ projectId }: { projectId: string }) {
               min={0}
               value={form.shipping_free_above_subtotal_nis}
               onChange={(e) => update("shipping_free_above_subtotal_nis", e.target.value)}
-            />
-          </Field>
-        </div>
-      </Card>
-
-      <Card className="p-5">
-        <h2 className="font-display text-xl">רשתות חברתיות</h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <Field label="Facebook URL">
-            <Input
-              value={form.facebook_url}
-              onChange={(e) => update("facebook_url", e.target.value)}
-              dir="ltr"
-            />
-          </Field>
-          <Field label="Instagram URL">
-            <Input
-              value={form.instagram_url}
-              onChange={(e) => update("instagram_url", e.target.value)}
-              dir="ltr"
-            />
-          </Field>
-          <Field label="WhatsApp (מספר בינלאומי)">
-            <Input
-              value={form.whatsapp_number}
-              onChange={(e) => update("whatsapp_number", e.target.value)}
-              dir="ltr"
-              placeholder="9725XXXXXXXX"
             />
           </Field>
         </div>
