@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthCtx = {
     user,
+    hydrated,
     clients,
     login(email, password) {
       const e = email.trim().toLowerCase();
