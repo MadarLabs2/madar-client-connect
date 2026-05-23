@@ -18,6 +18,7 @@ import { CategoriesManager } from "@/components/manage/CategoriesManager";
 import { OrdersManager } from "@/components/manage/OrdersManager";
 import { CustomersManager } from "@/components/manage/CustomersManager";
 import { ReportsManager } from "@/components/manage/ReportsManager";
+import { CouponsManager } from "@/components/manage/CouponsManager";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
