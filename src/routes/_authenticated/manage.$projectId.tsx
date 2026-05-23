@@ -14,6 +14,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ProductsManager } from "@/components/manage/ProductsManager";
+import { CategoriesManager } from "@/components/manage/CategoriesManager";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -126,6 +127,8 @@ function ManageProject() {
           <Reports projectId={projectId} />
         ) : activeTab.id === "products" ? (
           <ProductsManager projectId={projectId} />
+        ) : activeTab.id === "categories" ? (
+          <CategoriesManager projectId={projectId} />
         ) : (
           <ResourceTable projectId={projectId} table={activeTab.table!} label={activeTab.label} />
         )}
