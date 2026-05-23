@@ -7,9 +7,10 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthLayout() {
-  const { user, hydrated } = useAuth();
+  const { user, hydrated, role } = useAuth();
   if (!hydrated) return <div className="min-h-screen bg-background" />;
   if (!user) return <Navigate to="/login" />;
+  if (!role) return <div className="min-h-screen bg-background" />;
   return (
     <div className="min-h-screen bg-background">
       <Header />

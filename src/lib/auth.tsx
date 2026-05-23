@@ -1,94 +1,97 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { ADMIN, INITIAL_CLIENTS, type ClientAccount } from "./mock-data";
+import type { Session, User } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 
 export type Role = "admin" | "client";
 
-export interface SessionUser {
-  role: Role;
-  email: string;
+export interface Profile {
+  id: string;
   name: string;
-  clientId?: string;
+  company: string;
 }
 
 interface AuthCtx {
-  user: SessionUser | null;
+  session: Session | null;
+  user: User | null;
+  profile: Profile | null;
+  role: Role | null;
   hydrated: boolean;
-  clients: ClientAccount[];
-  login: (email: string, password: string) => { ok: true } | { ok: false; error: string };
-  logout: () => void;
-  addClient: (input: { name: string; company: string; email: string; password: string }) => ClientAccount;
+  signIn: (email: string, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  signUp: (input: { email: string; password: string; name: string; company: string }) => Promise<{ ok: true } | { ok: false; error: string }>;
+  signOut: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
-const STORAGE_KEY = "madar.session.v1";
-const CLIENTS_KEY = "madar.clients.v1";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(null);
-  const [clients, setClients] = useState<ClientAccount[]>(INITIAL_CLIENTS);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [role, setRole] = useState<Role | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEY);
-      if (s) setUser(JSON.parse(s));
-      const c = localStorage.getItem(CLIENTS_KEY);
-      if (c) setClients(JSON.parse(c));
-    } catch {}
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    localStorage.setItem(CLIENTS_KEY, JSON.stringify(clients));
-  }, [clients, hydrated]);
-
-  function persistUser(u: SessionUser | null) {
-    setUser(u);
-    if (u) localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
-    else localStorage.removeItem(STORAGE_KEY);
+  async function loadProfileAndRole(uid: string) {
+    const [{ data: p }, { data: roles }] = await Promise.all([
+      supabase.from("profiles").select("id,name,company").eq("id", uid).maybeSingle(),
+      supabase.from("user_roles").select("role").eq("user_id", uid),
+    ]);
+    setProfile(p ?? null);
+    const r = roles?.find((x) => x.role === "admin") ? "admin" : "client";
+    setRole(r);
   }
 
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      if (s?.user) {
+        // defer to avoid deadlock
+        setTimeout(() => loadProfileAndRole(s.user.id), 0);
+      } else {
+        setProfile(null);
+        setRole(null);
+      }
+    });
+
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      if (data.session?.user) {
+        loadProfileAndRole(data.session.user.id).finally(() => setHydrated(true));
+      } else {
+        setHydrated(true);
+      }
+    });
+
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   const value: AuthCtx = {
-    user,
+    session,
+    user: session?.user ?? null,
+    profile,
+    role,
     hydrated,
-    clients,
-    login(email, password) {
-      const e = email.trim().toLowerCase();
-      if (e === ADMIN.email && password === ADMIN.password) {
-        persistUser({ role: "admin", email: ADMIN.email, name: ADMIN.name });
-        return { ok: true };
-      }
-      const c = clients.find((x) => x.email.toLowerCase() === e && x.password === password);
-      if (c) {
-        persistUser({ role: "client", email: c.email, name: c.name, clientId: c.id });
-        return { ok: true };
-      }
-      return { ok: false, error: "Invalid email or password." };
+    async signIn(email, password) {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
     },
-    logout() {
-      persistUser(null);
-    },
-    addClient(input) {
-      const newClient: ClientAccount = {
-        id: `c${Date.now()}`,
-        name: input.name,
-        company: input.company,
-        email: input.email,
-        password: input.password,
-        createdAt: new Date().toISOString().slice(0, 10),
-        projects: [],
-        finance: {
-          income: 0,
-          expenses: 0,
-          netProfit: 0,
-          months: [],
-          breakdown: [],
+    async signUp({ email, password, name, company }) {
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+          data: { name, company },
         },
-        emails: [],
-      };
-      setClients((prev) => [newClient, ...prev]);
-      return newClient;
+      });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
+    async signOut() {
+      await supabase.auth.signOut();
+    },
+    async refresh() {
+      if (session?.user) await loadProfileAndRole(session.user.id);
     },
   };
 
