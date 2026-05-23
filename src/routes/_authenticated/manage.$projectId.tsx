@@ -127,7 +127,7 @@ function ManageProject() {
         ) : activeTab.id === "overview" ? (
           <Overview info={info} />
         ) : activeTab.id === "reports" ? (
-          <Reports projectId={projectId} />
+          <ReportsManager projectId={projectId} />
         ) : activeTab.id === "products" ? (
           <ProductsManager projectId={projectId} />
         ) : activeTab.id === "categories" ? (
