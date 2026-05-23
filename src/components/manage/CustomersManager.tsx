@@ -289,6 +289,20 @@ export function CustomersManager({ projectId }: { projectId: string }) {
                 <Button onClick={onSave} disabled={saving} className="w-full">
                   {saving ? "שומר…" : "שמירת שינויים"}
                 </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setSelected(null);
+                    navigate({
+                      to: ".",
+                      search: { tab: "orders" },
+                      params: { projectId },
+                    });
+                  }}
+                >
+                  <ShoppingCart className="ml-1 h-4 w-4" /> צפייה בהזמנות
+                </Button>
               </div>
 
               {isAdmin ? (
