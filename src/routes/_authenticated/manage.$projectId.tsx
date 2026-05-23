@@ -35,6 +35,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Upload,
 } from "lucide-react";
 
 const searchSchema = z.object({
