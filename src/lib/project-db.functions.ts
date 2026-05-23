@@ -162,3 +162,55 @@ export const projectUploadImage = createServerFn({ method: "POST" })
     const { data: pub } = client.storage.from(data.bucket).getPublicUrl(path);
     return { url: pub.publicUrl, path };
   });
+
+export const projectSendBroadcast = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        projectId: z.string().uuid(),
+        subject: z.string().min(1).max(200),
+        subjectAr: z.string().max(200).optional().default(""),
+        subjectEn: z.string().max(200).optional().default(""),
+        body: z.string().min(1).max(20000),
+        bodyAr: z.string().max(20000).optional().default(""),
+        bodyEn: z.string().max(20000).optional().default(""),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await isAdmin(context.userId);
+    const client = await getProjectClient(data.projectId, context.userId, admin);
+    const { data: subs, error } = await client
+      .from("newsletter_subscribers")
+      .select("email, locale");
+    if (error) throw new Error(error.message);
+    const recipients = (subs ?? []) as Array<{ email: string; locale: string }>;
+
+    // Try invoking project's edge function if it exists
+    try {
+      const { data: res, error: invErr } = await client.functions.invoke(
+        "send-newsletter-broadcast",
+        {
+          body: {
+            subject: data.subject,
+            subjectAr: data.subjectAr,
+            subjectEn: data.subjectEn,
+            body: data.body,
+            bodyAr: data.bodyAr,
+            bodyEn: data.bodyEn,
+          },
+        },
+      );
+      if (!invErr) {
+        const sent =
+          (res && typeof res === "object" && "sent" in res && Number((res as any).sent)) ||
+          recipients.length;
+        return { ok: true, sent };
+      }
+    } catch {
+      // fall through
+    }
+    // Fallback: no edge function available — return queued count only
+    return { ok: false, sent: 0, queued: recipients.length, error: "no_edge_function" };
+  });
