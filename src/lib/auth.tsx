@@ -12,6 +12,7 @@ export interface SessionUser {
 
 interface AuthCtx {
   user: SessionUser | null;
+  hydrated: boolean;
   clients: ClientAccount[];
   login: (email: string, password: string) => { ok: true } | { ok: false; error: string };
   logout: () => void;
