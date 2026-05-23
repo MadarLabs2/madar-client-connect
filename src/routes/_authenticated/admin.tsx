@@ -4,10 +4,20 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/external-db/client";
-import { inviteClient, createProject, updateProject, deleteProject } from "@/lib/admin.functions";
+import {
+  inviteClient,
+  createProject,
+  updateProject,
+  deleteProject,
+  updateClient,
+  deleteClient,
+  upsertProduct,
+  deleteProduct,
+} from "@/lib/admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +47,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Database, Package } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminDashboard,
@@ -59,8 +69,12 @@ type ProjectRow = {
   progress: number;
   live_url: string | null;
   cms_url: string | null;
+  supabase_url: string | null;
+  supabase_anon_key: string | null;
+  supabase_service_key: string | null;
   updated_at: string;
 };
+type ProductRow = { id: string; project_id: string; data: Record<string, unknown>; created_at: string };
 
 const PROJECT_TYPES: ProjectType[] = ["website", "ecommerce", "web_app", "branding", "marketing"];
 const PROJECT_STATUSES: ProjectStatus[] = ["planning", "in_progress", "review", "live", "paused"];
@@ -73,6 +87,9 @@ type ProjectForm = {
   progress: number;
   liveUrl: string;
   cmsUrl: string;
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  supabaseServiceKey: string;
 };
 
 const emptyProjectForm: ProjectForm = {
@@ -83,21 +100,32 @@ const emptyProjectForm: ProjectForm = {
   progress: 0,
   liveUrl: "",
   cmsUrl: "",
+  supabaseUrl: "",
+  supabaseAnonKey: "",
+  supabaseServiceKey: "",
 };
 
 function AdminDashboard() {
   const { role } = useAuth();
   const qc = useQueryClient();
   const invite = useServerFn(inviteClient);
+  const editClient = useServerFn(updateClient);
+  const removeClient = useServerFn(deleteClient);
   const addProject = useServerFn(createProject);
   const editProject = useServerFn(updateProject);
   const removeProject = useServerFn(deleteProject);
+  const saveProduct = useServerFn(upsertProduct);
+  const removeProduct = useServerFn(deleteProduct);
 
   const [clientOpen, setClientOpen] = useState(false);
   const [projOpen, setProjOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingClient, setEditingClient] = useState<ClientRow | null>(null);
+  const [deletingClientId, setDeletingClientId] = useState<string | null>(null);
+  const [productsProject, setProductsProject] = useState<ProjectRow | null>(null);
   const [form, setForm] = useState({ name: "", company: "", email: "", password: randomPassword() });
+  const [clientEditForm, setClientEditForm] = useState({ name: "", company: "" });
   const [pForm, setPForm] = useState<ProjectForm>(emptyProjectForm);
 
   const clientsQ = useQuery({
@@ -119,7 +147,7 @@ function AdminDashboard() {
     queryFn: async (): Promise<ProjectRow[]> => {
       const { data, error } = await supabase
         .from("projects")
-        .select("id,client_id,name,type,status,progress,live_url,cms_url,updated_at")
+        .select("id,client_id,name,type,status,progress,live_url,cms_url,supabase_url,supabase_anon_key,supabase_service_key,updated_at")
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return data as ProjectRow[];
@@ -160,8 +188,16 @@ function AdminDashboard() {
       progress: p.progress,
       liveUrl: p.live_url ?? "",
       cmsUrl: p.cms_url ?? "",
+      supabaseUrl: p.supabase_url ?? "",
+      supabaseAnonKey: p.supabase_anon_key ?? "",
+      supabaseServiceKey: p.supabase_service_key ?? "",
     });
     setProjOpen(true);
+  }
+
+  function openEditClient(c: ClientRow) {
+    setEditingClient(c);
+    setClientEditForm({ name: c.name, company: c.company });
   }
 
   async function handleAdd(e: React.FormEvent) {
@@ -178,6 +214,32 @@ function AdminDashboard() {
       qc.invalidateQueries({ queryKey: ["admin-clients"] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create client");
+    }
+  }
+
+  async function handleSaveClient(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingClient) return;
+    try {
+      await editClient({ data: { id: editingClient.id, ...clientEditForm } });
+      toast.success("Client updated");
+      setEditingClient(null);
+      qc.invalidateQueries({ queryKey: ["admin-clients"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update");
+    }
+  }
+
+  async function handleDeleteClient() {
+    if (!deletingClientId) return;
+    try {
+      await removeClient({ data: { id: deletingClientId } });
+      toast.success("Client deleted");
+      setDeletingClientId(null);
+      qc.invalidateQueries({ queryKey: ["admin-clients"] });
+      qc.invalidateQueries({ queryKey: ["admin-projects"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete");
     }
   }
 
@@ -269,12 +331,13 @@ function AdminDashboard() {
         </div>
       </header>
 
+      {/* Project dialog */}
       <Dialog open={projOpen} onOpenChange={(o) => { setProjOpen(o); if (!o) setEditingId(null); }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit project" : "Create project"}</DialogTitle>
             <DialogDescription>
-              {editingId ? "Update project details." : "Assign a new project to a client."}
+              {editingId ? "Update project details and DB connection." : "Assign a new project to a client."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveProject} className="space-y-4">
@@ -322,14 +385,39 @@ function AdminDashboard() {
               <Input id="pp" type="number" min={0} max={100} value={pForm.progress}
                 onChange={(e) => setPForm({ ...pForm, progress: Number(e.target.value) })} />
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="pl">Live URL (optional)</Label>
-              <Input id="pl" placeholder="https://…" value={pForm.liveUrl} onChange={(e) => setPForm({ ...pForm, liveUrl: e.target.value })} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="pl">Live URL</Label>
+                <Input id="pl" placeholder="https://…" value={pForm.liveUrl} onChange={(e) => setPForm({ ...pForm, liveUrl: e.target.value })} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="pc">CMS URL</Label>
+                <Input id="pc" placeholder="https://…" value={pForm.cmsUrl} onChange={(e) => setPForm({ ...pForm, cmsUrl: e.target.value })} />
+              </div>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="pc">CMS URL (optional)</Label>
-              <Input id="pc" placeholder="https://…" value={pForm.cmsUrl} onChange={(e) => setPForm({ ...pForm, cmsUrl: e.target.value })} />
+
+            <div className="space-y-3 rounded-md border border-border bg-muted/30 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Database className="h-4 w-4" /> Project DB connection (optional)
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="su">Supabase URL</Label>
+                <Input id="su" placeholder="https://xxx.supabase.co" value={pForm.supabaseUrl}
+                  onChange={(e) => setPForm({ ...pForm, supabaseUrl: e.target.value })} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="sa">Anon (publishable) key</Label>
+                <Input id="sa" value={pForm.supabaseAnonKey}
+                  onChange={(e) => setPForm({ ...pForm, supabaseAnonKey: e.target.value })} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="ss">Service role key</Label>
+                <Input id="ss" type="password" value={pForm.supabaseServiceKey}
+                  onChange={(e) => setPForm({ ...pForm, supabaseServiceKey: e.target.value })} />
+                <p className="text-xs text-muted-foreground">Stored encrypted at rest. Only admins can read it.</p>
+              </div>
             </div>
+
             <DialogFooter>
               <Button type="submit">{editingId ? "Save changes" : "Create project"}</Button>
             </DialogFooter>
@@ -337,12 +425,36 @@ function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit client dialog */}
+      <Dialog open={!!editingClient} onOpenChange={(o) => !o && setEditingClient(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit client</DialogTitle>
+            <DialogDescription>Update name and company.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveClient} className="space-y-4">
+            <div className="grid gap-1.5">
+              <Label htmlFor="ecn">Contact name</Label>
+              <Input id="ecn" value={clientEditForm.name}
+                onChange={(e) => setClientEditForm({ ...clientEditForm, name: e.target.value })} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="ecc">Company</Label>
+              <Input id="ecc" value={clientEditForm.company}
+                onChange={(e) => setClientEditForm({ ...clientEditForm, company: e.target.value })} />
+            </div>
+            <DialogFooter><Button type="submit">Save</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete project alert */}
       <AlertDialog open={!!deletingId} onOpenChange={(o) => !o && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete project?</AlertDialogTitle>
             <AlertDialogDescription>
-              This cannot be undone. The project will be permanently removed.
+              This cannot be undone. The project and its products will be permanently removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -351,6 +463,30 @@ function AdminDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Delete client alert */}
+      <AlertDialog open={!!deletingClientId} onOpenChange={(o) => !o && setDeletingClientId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete client?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deletes the user account, profile, projects, and all linked products. Cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteClient}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Products manager */}
+      <ProductsDialog
+        project={productsProject}
+        onClose={() => setProductsProject(null)}
+        saveProduct={saveProduct}
+        removeProduct={removeProduct}
+      />
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         {[
@@ -389,8 +525,14 @@ function AdminDashboard() {
                         <span className="truncate text-sm text-muted-foreground">{c.name || "(no name)"}</span>
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
+                    <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                       <span>{cp.length} project{cp.length === 1 ? "" : "s"}</span>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditClient(c)} aria-label="Edit client">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingClientId(c.id)} aria-label="Delete client">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
                   {cp.length === 0 ? (
@@ -405,10 +547,18 @@ function AdminDashboard() {
                               <span className="text-xs text-muted-foreground">·</span>
                               <span className="text-xs capitalize text-muted-foreground">{p.type.replace("_", " ")}</span>
                               <StatusBadge status={p.status} />
+                              {p.supabase_url && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                  <Database className="h-3 w-3" /> DB
+                                </span>
+                              )}
                             </div>
                           </div>
                           <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                             <span className="tabular-nums">{p.progress}%</span>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setProductsProject(p)} aria-label="Manage products">
+                              <Package className="h-3.5 w-3.5" />
+                            </Button>
                             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditProject(p)} aria-label="Edit">
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
@@ -427,5 +577,131 @@ function AdminDashboard() {
         )}
       </section>
     </div>
+  );
+}
+
+function ProductsDialog({
+  project,
+  onClose,
+  saveProduct,
+  removeProduct,
+}: {
+  project: ProjectRow | null;
+  onClose: () => void;
+  saveProduct: (args: { data: { id?: string; projectId: string; data: Record<string, unknown> } }) => Promise<unknown>;
+  removeProduct: (args: { data: { id: string } }) => Promise<unknown>;
+}) {
+  const qc = useQueryClient();
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [jsonText, setJsonText] = useState('{\n  "name": "",\n  "price": 0\n}');
+
+  const productsQ = useQuery({
+    queryKey: ["admin-products", project?.id],
+    enabled: !!project,
+    queryFn: async (): Promise<ProductRow[]> => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id,project_id,data,created_at")
+        .eq("project_id", project!.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as ProductRow[];
+    },
+  });
+
+  function reset() {
+    setEditingProductId(null);
+    setJsonText('{\n  "name": "",\n  "price": 0\n}');
+  }
+
+  async function save() {
+    if (!project) return;
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(jsonText);
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        throw new Error("Must be a JSON object");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Invalid JSON");
+      return;
+    }
+    try {
+      await saveProduct({ data: { id: editingProductId ?? undefined, projectId: project.id, data: parsed } });
+      toast.success(editingProductId ? "Product updated" : "Product added");
+      reset();
+      qc.invalidateQueries({ queryKey: ["admin-products", project.id] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    }
+  }
+
+  async function remove(id: string) {
+    try {
+      await removeProduct({ data: { id } });
+      toast.success("Product deleted");
+      qc.invalidateQueries({ queryKey: ["admin-products", project?.id] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete");
+    }
+  }
+
+  return (
+    <Dialog open={!!project} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Products · {project?.name}</DialogTitle>
+          <DialogDescription>
+            Flexible JSON entries. Add any fields you need per product.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <Label htmlFor="json">{editingProductId ? "Edit product (JSON)" : "New product (JSON)"}</Label>
+          <Textarea
+            id="json"
+            value={jsonText}
+            onChange={(e) => setJsonText(e.target.value)}
+            className="min-h-[160px] font-mono text-xs"
+          />
+          <div className="flex gap-2">
+            <Button onClick={save}>{editingProductId ? "Save changes" : "Add product"}</Button>
+            {editingProductId && (
+              <Button variant="outline" onClick={reset}>Cancel</Button>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">Existing ({productsQ.data?.length ?? 0})</h3>
+          {productsQ.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : (productsQ.data?.length ?? 0) === 0 ? (
+            <p className="text-sm text-muted-foreground">No products yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {productsQ.data!.map((pr) => (
+                <li key={pr.id} className="rounded-md border border-border bg-muted/30 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <pre className="min-w-0 flex-1 overflow-x-auto text-xs">{JSON.stringify(pr.data, null, 2)}</pre>
+                    <div className="flex shrink-0 gap-1">
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => {
+                        setEditingProductId(pr.id);
+                        setJsonText(JSON.stringify(pr.data, null, 2));
+                      }} aria-label="Edit">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => remove(pr.id)} aria-label="Delete">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
