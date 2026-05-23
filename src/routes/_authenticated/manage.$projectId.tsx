@@ -20,6 +20,7 @@ import { CustomersManager } from "@/components/manage/CustomersManager";
 import { ReportsManager } from "@/components/manage/ReportsManager";
 import { CouponsManager } from "@/components/manage/CouponsManager";
 import { NotificationsManager } from "@/components/manage/NotificationsManager";
+import { SettingsManager } from "@/components/manage/SettingsManager";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -142,9 +143,9 @@ function ManageProject() {
           <CouponsManager projectId={projectId} />
         ) : activeTab.id === "notifications" ? (
           <NotificationsManager projectId={projectId} />
-        ) : (
-          <ResourceTable projectId={projectId} table={activeTab.table!} label={activeTab.label} />
-        )}
+        ) : activeTab.id === "settings" ? (
+          <SettingsManager projectId={projectId} />
+        ) : null}
       </main>
     </div>
   );
