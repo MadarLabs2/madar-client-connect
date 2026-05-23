@@ -90,15 +90,15 @@ export function ReportsManager({ projectId }: { projectId: string }) {
 
   const { data: ordersRes, isLoading: ordersLoading, error: ordersError } = useQuery({
     queryKey: ["pdb", projectId, "orders"],
-    queryFn: () => listFn({ data: { projectId, table: "orders", limit: 1000 } }),
+    queryFn: () => listFn({ data: { projectId, table: "orders", limit: 500 } }),
   });
   const { data: productsRes, isLoading: productsLoading } = useQuery({
     queryKey: ["pdb", projectId, "products"],
-    queryFn: () => listFn({ data: { projectId, table: "products", limit: 1000 } }),
+    queryFn: () => listFn({ data: { projectId, table: "products", limit: 500 } }),
   });
   const { data: customersRes, isLoading: customersLoading } = useQuery({
     queryKey: ["pdb", projectId, "profiles"],
-    queryFn: () => listFn({ data: { projectId, table: "profiles", limit: 1000 } }),
+    queryFn: () => listFn({ data: { projectId, table: "profiles", limit: 500 } }),
   });
 
   const orders: any[] = ordersRes?.rows ?? [];
