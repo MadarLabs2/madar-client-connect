@@ -19,19 +19,24 @@ const TableSchema = z.enum(ALLOWED_TABLES);
 export const projectList = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z.object({
-      projectId: z.string().uuid(),
-      table: TableSchema,
-      limit: z.number().int().min(1).max(500).default(200),
-    }).parse(input),
+    z
+      .object({
+        projectId: z.string().uuid(),
+        table: TableSchema,
+        limit: z.coerce
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .default(200)
+          .transform((limit) => Math.min(limit, 500)),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const admin = await isAdmin(context.userId);
     const client = await getProjectClient(data.projectId, context.userId, admin);
-    const { data: rows, error } = await client
-      .from(data.table)
-      .select("*")
-      .limit(data.limit);
+    const { data: rows, error } = await client.from(data.table).select("*").limit(data.limit);
     if (error) return { rows: [], error: error.message };
     return { rows: rows ?? [], error: null };
   });
@@ -39,11 +44,13 @@ export const projectList = createServerFn({ method: "POST" })
 export const projectInsert = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z.object({
-      projectId: z.string().uuid(),
-      table: TableSchema,
-      row: z.record(z.string(), z.unknown()),
-    }).parse(input),
+    z
+      .object({
+        projectId: z.string().uuid(),
+        table: TableSchema,
+        row: z.record(z.string(), z.unknown()),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const admin = await isAdmin(context.userId);
@@ -56,12 +63,14 @@ export const projectInsert = createServerFn({ method: "POST" })
 export const projectUpdate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z.object({
-      projectId: z.string().uuid(),
-      table: TableSchema,
-      id: z.union([z.string(), z.number()]),
-      row: z.record(z.string(), z.unknown()),
-    }).parse(input),
+    z
+      .object({
+        projectId: z.string().uuid(),
+        table: TableSchema,
+        id: z.union([z.string(), z.number()]),
+        row: z.record(z.string(), z.unknown()),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const admin = await isAdmin(context.userId);
@@ -74,11 +83,13 @@ export const projectUpdate = createServerFn({ method: "POST" })
 export const projectDelete = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z.object({
-      projectId: z.string().uuid(),
-      table: TableSchema,
-      id: z.union([z.string(), z.number()]),
-    }).parse(input),
+    z
+      .object({
+        projectId: z.string().uuid(),
+        table: TableSchema,
+        id: z.union([z.string(), z.number()]),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const admin = await isAdmin(context.userId);
@@ -95,7 +106,9 @@ export const projectInfo = createServerFn({ method: "POST" })
     const admin = await isAdmin(context.userId);
     const { data: project, error } = await supabaseAdmin
       .from("projects")
-      .select("id,name,client_id,supabase_url,supabase_service_key,supabase_anon_key,live_url,cms_url,status,type,progress")
+      .select(
+        "id,name,client_id,supabase_url,supabase_service_key,supabase_anon_key,live_url,cms_url,status,type,progress",
+      )
       .eq("id", data.projectId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -104,7 +117,10 @@ export const projectInfo = createServerFn({ method: "POST" })
     return {
       id: project.id,
       name: project.name,
-      hasCredentials: !!(project.supabase_url && (project.supabase_service_key || project.supabase_anon_key)),
+      hasCredentials: !!(
+        project.supabase_url &&
+        (project.supabase_service_key || project.supabase_anon_key)
+      ),
       liveUrl: project.live_url,
       status: project.status,
       type: project.type,
@@ -115,14 +131,16 @@ export const projectInfo = createServerFn({ method: "POST" })
 export const projectUploadImage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z.object({
-      projectId: z.string().uuid(),
-      fileName: z.string().min(1).max(255),
-      contentType: z.string().min(1).max(100),
-      dataBase64: z.string().min(1),
-      bucket: z.string().min(1).max(100).default("product-images"),
-      folder: z.string().max(200).optional(),
-    }).parse(input),
+    z
+      .object({
+        projectId: z.string().uuid(),
+        fileName: z.string().min(1).max(255),
+        contentType: z.string().min(1).max(100),
+        dataBase64: z.string().min(1),
+        bucket: z.string().min(1).max(100).default("product-images"),
+        folder: z.string().max(200).optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const admin = await isAdmin(context.userId);
