@@ -19,6 +19,7 @@ import { OrdersManager } from "@/components/manage/OrdersManager";
 import { CustomersManager } from "@/components/manage/CustomersManager";
 import { ReportsManager } from "@/components/manage/ReportsManager";
 import { CouponsManager } from "@/components/manage/CouponsManager";
+import { NotificationsManager } from "@/components/manage/NotificationsManager";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -139,6 +140,8 @@ function ManageProject() {
           <CustomersManager projectId={projectId} />
         ) : activeTab.id === "coupons" ? (
           <CouponsManager projectId={projectId} />
+        ) : activeTab.id === "notifications" ? (
+          <NotificationsManager projectId={projectId} />
         ) : (
           <ResourceTable projectId={projectId} table={activeTab.table!} label={activeTab.label} />
         )}
