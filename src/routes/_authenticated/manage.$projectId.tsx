@@ -206,7 +206,7 @@ function Reports({ projectId }: { projectId: string }) {
   );
 }
 
-type Table = "products" | "categories" | "orders" | "customers" | "coupons" | "notifications" | "settings";
+type Table = "products" | "categories" | "orders" | "profiles" | "coupons" | "newsletter_subscribers" | "site_settings";
 
 function ResourceTable({ projectId, table, label }: { projectId: string; table: Table; label: string }) {
   const qc = useQueryClient();
