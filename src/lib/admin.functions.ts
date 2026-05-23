@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/external-db/auth-middleware";
+import { supabaseAdmin } from "@/integrations/external-db/client.server";
 
 async function assertAdmin(userId: string) {
   const { data, error } = await supabaseAdmin
