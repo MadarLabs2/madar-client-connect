@@ -34,6 +34,7 @@ type CustomerRow = {
 
 export function CustomersManager({ projectId }: { projectId: string }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const listFn = useServerFn(projectList);
   const updateFn = useServerFn(projectUpdate);
   const deleteFn = useServerFn(projectDelete);
