@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   projectList,
@@ -18,7 +19,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Search, Eye, Trash2, Ban, CheckCircle2 } from "lucide-react";
+import { Search, Eye, Trash2, Ban, CheckCircle2, ShoppingCart } from "lucide-react";
 
 type CustomerRow = {
   id: string;
@@ -33,6 +34,7 @@ type CustomerRow = {
 
 export function CustomersManager({ projectId }: { projectId: string }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const listFn = useServerFn(projectList);
   const updateFn = useServerFn(projectUpdate);
   const deleteFn = useServerFn(projectDelete);
@@ -244,6 +246,12 @@ export function CustomersManager({ projectId }: { projectId: string }) {
             </DialogTitle>
           </DialogHeader>
 
+          {selected?.is_blocked && (
+            <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              חסום — המשתמש לא יכול להתחבר
+            </div>
+          )}
+
           {selected && (
             <div className="space-y-4">
               <Card className="p-3 text-sm space-y-1">
@@ -280,6 +288,20 @@ export function CustomersManager({ projectId }: { projectId: string }) {
                 </div>
                 <Button onClick={onSave} disabled={saving} className="w-full">
                   {saving ? "שומר…" : "שמירת שינויים"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setSelected(null);
+                    navigate({
+                      to: ".",
+                      search: { tab: "orders" },
+                      params: { projectId },
+                    });
+                  }}
+                >
+                  <ShoppingCart className="ml-1 h-4 w-4" /> צפייה בהזמנות
                 </Button>
               </div>
 
