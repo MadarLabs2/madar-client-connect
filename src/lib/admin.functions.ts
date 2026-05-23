@@ -26,7 +26,6 @@ export const inviteClient = createServerFn({ method: "POST" })
   .inputValidator((input) => InviteSchema.parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
       password: data.password,
@@ -35,15 +34,40 @@ export const inviteClient = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
     if (!created.user) throw new Error("Failed to create user");
-
-    // Trigger creates profile + 'client' role. Ensure profile has name/company
-    // in case metadata wasn't populated yet.
     await supabaseAdmin
       .from("profiles")
       .update({ name: data.name, company: data.company })
       .eq("id", created.user.id);
-
     return { ok: true, userId: created.user.id };
+  });
+
+const UpdateClientSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(120),
+  company: z.string().min(1).max(120),
+});
+
+export const updateClient = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => UpdateClientSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({ name: data.name, company: data.company })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteClient = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 const ProjectSchema = z.object({
@@ -54,29 +78,37 @@ const ProjectSchema = z.object({
   progress: z.number().int().min(0).max(100),
   liveUrl: z.string().url().max(500).optional().or(z.literal("")),
   cmsUrl: z.string().url().max(500).optional().or(z.literal("")),
+  supabaseUrl: z.string().url().max(500).optional().or(z.literal("")),
+  supabaseAnonKey: z.string().max(2000).optional().or(z.literal("")),
+  supabaseServiceKey: z.string().max(2000).optional().or(z.literal("")),
 });
+
+function projectPayload(d: z.infer<typeof ProjectSchema>) {
+  return {
+    client_id: d.clientId,
+    name: d.name,
+    type: d.type,
+    status: d.status,
+    progress: d.progress,
+    live_url: d.liveUrl || null,
+    cms_url: d.cmsUrl || null,
+    supabase_url: d.supabaseUrl || null,
+    supabase_anon_key: d.supabaseAnonKey || null,
+    supabase_service_key: d.supabaseServiceKey || null,
+  };
+}
 
 export const createProject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => ProjectSchema.parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const { error } = await supabaseAdmin.from("projects").insert({
-      client_id: data.clientId,
-      name: data.name,
-      type: data.type,
-      status: data.status,
-      progress: data.progress,
-      live_url: data.liveUrl || null,
-      cms_url: data.cmsUrl || null,
-    });
+    const { error } = await supabaseAdmin.from("projects").insert(projectPayload(data));
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
-const UpdateProjectSchema = ProjectSchema.extend({
-  id: z.string().uuid(),
-});
+const UpdateProjectSchema = ProjectSchema.extend({ id: z.string().uuid() });
 
 export const updateProject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -85,15 +117,7 @@ export const updateProject = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
     const { error } = await supabaseAdmin
       .from("projects")
-      .update({
-        client_id: data.clientId,
-        name: data.name,
-        type: data.type,
-        status: data.status,
-        progress: data.progress,
-        live_url: data.liveUrl || null,
-        cms_url: data.cmsUrl || null,
-      })
+      .update(projectPayload(data))
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -105,6 +129,45 @@ export const deleteProject = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
     const { error } = await supabaseAdmin.from("projects").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ============ Products ============
+const ProductDataSchema = z.record(z.string(), z.unknown());
+
+export const upsertProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      id: z.string().uuid().optional(),
+      projectId: z.string().uuid(),
+      data: ProductDataSchema,
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    if (data.id) {
+      const { error } = await supabaseAdmin
+        .from("products")
+        .update({ data: data.data })
+        .eq("id", data.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabaseAdmin
+        .from("products")
+        .insert({ project_id: data.projectId, data: data.data });
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
+
+export const deleteProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await supabaseAdmin.from("products").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
