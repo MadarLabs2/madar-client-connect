@@ -13,6 +13,7 @@ import {
 } from "@/lib/project-db.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ProductsManager } from "@/components/manage/ProductsManager";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -123,6 +124,8 @@ function ManageProject() {
           <Overview info={info} />
         ) : activeTab.id === "reports" ? (
           <Reports projectId={projectId} />
+        ) : activeTab.id === "products" ? (
+          <ProductsManager projectId={projectId} />
         ) : (
           <ResourceTable projectId={projectId} table={activeTab.table!} label={activeTab.label} />
         )}

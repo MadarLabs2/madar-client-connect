@@ -121,23 +121,26 @@ export const projectUploadImage = createServerFn({ method: "POST" })
       contentType: z.string().min(1).max(100),
       dataBase64: z.string().min(1),
       bucket: z.string().min(1).max(100).default("product-images"),
+      folder: z.string().max(200).optional(),
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
     const admin = await isAdmin(context.userId);
     const client = await getProjectClient(data.projectId, context.userId, admin);
     const bytes = Uint8Array.from(atob(data.dataBase64), (c) => c.charCodeAt(0));
-    const ext = data.fileName.split(".").pop() || "jpg";
-    const safe = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const ext = (data.fileName.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const cleanFolder = (data.folder || "").replace(/^\/+|\/+$/g, "");
+    const path = cleanFolder ? `${cleanFolder}/${safeName}` : safeName;
 
     // Ensure bucket exists (best-effort, ignore "already exists")
     await client.storage.createBucket(data.bucket, { public: true }).catch(() => {});
 
     const { error: upErr } = await client.storage
       .from(data.bucket)
-      .upload(safe, bytes, { contentType: data.contentType, upsert: false });
+      .upload(path, bytes, { contentType: data.contentType, upsert: false });
     if (upErr) throw new Error(upErr.message);
 
-    const { data: pub } = client.storage.from(data.bucket).getPublicUrl(safe);
-    return { url: pub.publicUrl, path: safe };
+    const { data: pub } = client.storage.from(data.bucket).getPublicUrl(path);
+    return { url: pub.publicUrl, path };
   });
