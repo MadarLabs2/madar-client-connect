@@ -169,8 +169,8 @@ function Reports({ projectId }: { projectId: string }) {
     queryFn: () => listFn({ data: { projectId, table: "products", limit: 500 } }),
   });
   const { data: customersRes } = useQuery({
-    queryKey: ["pdb", projectId, "customers"],
-    queryFn: () => listFn({ data: { projectId, table: "customers", limit: 500 } }),
+    queryKey: ["pdb", projectId, "profiles"],
+    queryFn: () => listFn({ data: { projectId, table: "profiles", limit: 500 } }),
   });
 
   const orders = ordersRes?.rows ?? [];
