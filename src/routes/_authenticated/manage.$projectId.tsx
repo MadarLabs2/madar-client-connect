@@ -17,6 +17,7 @@ import { ProductsManager } from "@/components/manage/ProductsManager";
 import { CategoriesManager } from "@/components/manage/CategoriesManager";
 import { OrdersManager } from "@/components/manage/OrdersManager";
 import { CustomersManager } from "@/components/manage/CustomersManager";
+import { ReportsManager } from "@/components/manage/ReportsManager";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -126,7 +127,7 @@ function ManageProject() {
         ) : activeTab.id === "overview" ? (
           <Overview info={info} />
         ) : activeTab.id === "reports" ? (
-          <Reports projectId={projectId} />
+          <ReportsManager projectId={projectId} />
         ) : activeTab.id === "products" ? (
           <ProductsManager projectId={projectId} />
         ) : activeTab.id === "categories" ? (
