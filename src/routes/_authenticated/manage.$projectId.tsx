@@ -9,6 +9,7 @@ import {
   projectInsert,
   projectUpdate,
   projectDelete,
+  projectUploadImage,
 } from "@/lib/project-db.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
