@@ -127,6 +127,8 @@ function ManageProject() {
           <Reports projectId={projectId} />
         ) : activeTab.id === "products" ? (
           <ProductsManager projectId={projectId} />
+        ) : activeTab.id === "categories" ? (
+          <CategoriesManager projectId={projectId} />
         ) : (
           <ResourceTable projectId={projectId} table={activeTab.table!} label={activeTab.label} />
         )}
