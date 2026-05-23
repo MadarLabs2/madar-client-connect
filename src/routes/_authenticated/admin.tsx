@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/external-db/client";
-import { inviteClient, createProject } from "@/lib/admin.functions";
+import { inviteClient, createProject, updateProject, deleteProject } from "@/lib/admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -27,6 +37,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
+import { Pencil, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminDashboard,
@@ -37,14 +48,41 @@ function randomPassword() {
 }
 
 type ClientRow = { id: string; name: string; company: string };
+type ProjectType = "website" | "ecommerce" | "web_app" | "branding" | "marketing";
+type ProjectStatus = "planning" | "in_progress" | "review" | "live" | "paused";
 type ProjectRow = {
   id: string;
   client_id: string;
   name: string;
-  type: "website" | "ecommerce" | "web_app" | "branding" | "marketing";
-  status: "planning" | "in_progress" | "review" | "live" | "paused";
+  type: ProjectType;
+  status: ProjectStatus;
   progress: number;
+  live_url: string | null;
+  cms_url: string | null;
   updated_at: string;
+};
+
+const PROJECT_TYPES: ProjectType[] = ["website", "ecommerce", "web_app", "branding", "marketing"];
+const PROJECT_STATUSES: ProjectStatus[] = ["planning", "in_progress", "review", "live", "paused"];
+
+type ProjectForm = {
+  clientId: string;
+  name: string;
+  type: ProjectType;
+  status: ProjectStatus;
+  progress: number;
+  liveUrl: string;
+  cmsUrl: string;
+};
+
+const emptyProjectForm: ProjectForm = {
+  clientId: "",
+  name: "",
+  type: "website",
+  status: "planning",
+  progress: 0,
+  liveUrl: "",
+  cmsUrl: "",
 };
 
 function AdminDashboard() {
@@ -52,24 +90,19 @@ function AdminDashboard() {
   const qc = useQueryClient();
   const invite = useServerFn(inviteClient);
   const addProject = useServerFn(createProject);
+  const editProject = useServerFn(updateProject);
+  const removeProject = useServerFn(deleteProject);
 
-  const [open, setOpen] = useState(false);
+  const [clientOpen, setClientOpen] = useState(false);
   const [projOpen, setProjOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", company: "", email: "", password: randomPassword() });
-  const [pForm, setPForm] = useState({
-    clientId: "",
-    name: "",
-    type: "website" as ProjectRow["type"],
-    status: "planning" as ProjectRow["status"],
-    progress: 0,
-    liveUrl: "",
-    cmsUrl: "",
-  });
+  const [pForm, setPForm] = useState<ProjectForm>(emptyProjectForm);
 
   const clientsQ = useQuery({
     queryKey: ["admin-clients"],
     queryFn: async (): Promise<ClientRow[]> => {
-      // Admin RLS allows reading all profiles. Exclude self by joining roles client-side.
       const [{ data: profiles, error: pErr }, { data: roles, error: rErr }] = await Promise.all([
         supabase.from("profiles").select("id,name,company"),
         supabase.from("user_roles").select("user_id,role"),
@@ -86,7 +119,7 @@ function AdminDashboard() {
     queryFn: async (): Promise<ProjectRow[]> => {
       const { data, error } = await supabase
         .from("projects")
-        .select("id,client_id,name,type,status,progress,updated_at")
+        .select("id,client_id,name,type,status,progress,live_url,cms_url,updated_at")
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return data as ProjectRow[];
@@ -98,22 +131,38 @@ function AdminDashboard() {
   const clients = clientsQ.data ?? [];
   const projects = projectsQ.data ?? [];
 
-  const metrics = useMemo(() => {
-    return {
-      clients: clients.length,
-      active: projects.filter((p) => p.status === "in_progress" || p.status === "review").length,
-      live: projects.filter((p) => p.status === "live").length,
-      total: projects.length,
-    };
-  }, [clients, projects]);
+  const metrics = useMemo(() => ({
+    clients: clients.length,
+    active: projects.filter((p) => p.status === "in_progress" || p.status === "review").length,
+    live: projects.filter((p) => p.status === "live").length,
+    total: projects.length,
+  }), [clients, projects]);
 
   const projectsByClient = useMemo(() => {
     const map: Record<string, ProjectRow[]> = {};
-    for (const p of projects) {
-      (map[p.client_id] ||= []).push(p);
-    }
+    for (const p of projects) (map[p.client_id] ||= []).push(p);
     return map;
   }, [projects]);
+
+  function openNewProject() {
+    setEditingId(null);
+    setPForm(emptyProjectForm);
+    setProjOpen(true);
+  }
+
+  function openEditProject(p: ProjectRow) {
+    setEditingId(p.id);
+    setPForm({
+      clientId: p.client_id,
+      name: p.name,
+      type: p.type,
+      status: p.status,
+      progress: p.progress,
+      liveUrl: p.live_url ?? "",
+      cmsUrl: p.cms_url ?? "",
+    });
+    setProjOpen(true);
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -124,7 +173,7 @@ function AdminDashboard() {
     try {
       await invite({ data: form });
       toast.success(`Client created · ${form.email}`);
-      setOpen(false);
+      setClientOpen(false);
       setForm({ name: "", company: "", email: "", password: randomPassword() });
       qc.invalidateQueries({ queryKey: ["admin-clients"] });
     } catch (err) {
@@ -132,20 +181,38 @@ function AdminDashboard() {
     }
   }
 
-  async function handleAddProject(e: React.FormEvent) {
+  async function handleSaveProject(e: React.FormEvent) {
     e.preventDefault();
     if (!pForm.clientId || !pForm.name) {
       toast.error("Pick a client and enter a project name");
       return;
     }
     try {
-      await addProject({ data: pForm });
-      toast.success("Project created");
+      if (editingId) {
+        await editProject({ data: { ...pForm, id: editingId } });
+        toast.success("Project updated");
+      } else {
+        await addProject({ data: pForm });
+        toast.success("Project created");
+      }
       setProjOpen(false);
-      setPForm({ ...pForm, name: "", liveUrl: "", cmsUrl: "", progress: 0 });
+      setEditingId(null);
+      setPForm(emptyProjectForm);
       qc.invalidateQueries({ queryKey: ["admin-projects"] });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create project");
+      toast.error(err instanceof Error ? err.message : "Failed to save project");
+    }
+  }
+
+  async function handleDelete() {
+    if (!deletingId) return;
+    try {
+      await removeProject({ data: { id: deletingId } });
+      toast.success("Project deleted");
+      setDeletingId(null);
+      qc.invalidateQueries({ queryKey: ["admin-projects"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete");
     }
   }
 
@@ -159,76 +226,8 @@ function AdminDashboard() {
           <h1 className="mt-1 font-display text-4xl tracking-tight">Client portfolio</h1>
         </div>
         <div className="flex gap-2">
-          <Dialog open={projOpen} onOpenChange={setProjOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">New project</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create project</DialogTitle>
-                <DialogDescription>Assign a new project to a client.</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddProject} className="space-y-4">
-                <div className="grid gap-1.5">
-                  <Label>Client</Label>
-                  <Select value={pForm.clientId} onValueChange={(v) => setPForm({ ...pForm, clientId: v })}>
-                    <SelectTrigger><SelectValue placeholder="Choose a client" /></SelectTrigger>
-                    <SelectContent>
-                      {clients.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.company} — {c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="pn">Project name</Label>
-                  <Input id="pn" value={pForm.name} onChange={(e) => setPForm({ ...pForm, name: e.target.value })} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1.5">
-                    <Label>Type</Label>
-                    <Select value={pForm.type} onValueChange={(v) => setPForm({ ...pForm, type: v as ProjectRow["type"] })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {["website", "ecommerce", "web_app", "branding", "marketing"].map((t) => (
-                          <SelectItem key={t} value={t}>{t.replace("_", " ")}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label>Status</Label>
-                    <Select value={pForm.status} onValueChange={(v) => setPForm({ ...pForm, status: v as ProjectRow["status"] })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {["planning", "in_progress", "review", "live", "paused"].map((t) => (
-                          <SelectItem key={t} value={t}>{t.replace("_", " ")}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="pp">Progress (%)</Label>
-                  <Input id="pp" type="number" min={0} max={100} value={pForm.progress}
-                    onChange={(e) => setPForm({ ...pForm, progress: Number(e.target.value) })} />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="pl">Live URL (optional)</Label>
-                  <Input id="pl" placeholder="https://…" value={pForm.liveUrl} onChange={(e) => setPForm({ ...pForm, liveUrl: e.target.value })} />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="pc">CMS URL (optional)</Label>
-                  <Input id="pc" placeholder="https://…" value={pForm.cmsUrl} onChange={(e) => setPForm({ ...pForm, cmsUrl: e.target.value })} />
-                </div>
-                <DialogFooter>
-                  <Button type="submit">Create project</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Button variant="outline" onClick={openNewProject}>New project</Button>
+          <Dialog open={clientOpen} onOpenChange={setClientOpen}>
             <DialogTrigger asChild>
               <Button>Add new client</Button>
             </DialogTrigger>
@@ -236,7 +235,7 @@ function AdminDashboard() {
               <DialogHeader>
                 <DialogTitle>New client account</DialogTitle>
                 <DialogDescription>
-                  Generates login credentials. The client can sign in immediately with the email and password below.
+                  Generates login credentials. The client can sign in immediately.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAdd} className="space-y-4">
@@ -270,6 +269,89 @@ function AdminDashboard() {
         </div>
       </header>
 
+      <Dialog open={projOpen} onOpenChange={(o) => { setProjOpen(o); if (!o) setEditingId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingId ? "Edit project" : "Create project"}</DialogTitle>
+            <DialogDescription>
+              {editingId ? "Update project details." : "Assign a new project to a client."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveProject} className="space-y-4">
+            <div className="grid gap-1.5">
+              <Label>Client</Label>
+              <Select value={pForm.clientId} onValueChange={(v) => setPForm({ ...pForm, clientId: v })}>
+                <SelectTrigger><SelectValue placeholder="Choose a client" /></SelectTrigger>
+                <SelectContent>
+                  {clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.company} — {c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pn">Project name</Label>
+              <Input id="pn" value={pForm.name} onChange={(e) => setPForm({ ...pForm, name: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>Type</Label>
+                <Select value={pForm.type} onValueChange={(v) => setPForm({ ...pForm, type: v as ProjectType })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PROJECT_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>{t.replace("_", " ")}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Status</Label>
+                <Select value={pForm.status} onValueChange={(v) => setPForm({ ...pForm, status: v as ProjectStatus })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PROJECT_STATUSES.map((t) => (
+                      <SelectItem key={t} value={t}>{t.replace("_", " ")}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pp">Progress (%)</Label>
+              <Input id="pp" type="number" min={0} max={100} value={pForm.progress}
+                onChange={(e) => setPForm({ ...pForm, progress: Number(e.target.value) })} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pl">Live URL (optional)</Label>
+              <Input id="pl" placeholder="https://…" value={pForm.liveUrl} onChange={(e) => setPForm({ ...pForm, liveUrl: e.target.value })} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pc">CMS URL (optional)</Label>
+              <Input id="pc" placeholder="https://…" value={pForm.cmsUrl} onChange={(e) => setPForm({ ...pForm, cmsUrl: e.target.value })} />
+            </div>
+            <DialogFooter>
+              <Button type="submit">{editingId ? "Save changes" : "Create project"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deletingId} onOpenChange={(o) => !o && setDeletingId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This cannot be undone. The project will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         {[
           { label: "Clients", value: metrics.clients },
@@ -285,12 +367,7 @@ function AdminDashboard() {
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-baseline justify-between">
-          <h2 className="font-display text-2xl tracking-tight">All clients</h2>
-          <span className="text-sm text-muted-foreground">
-            System status · <span className="text-[oklch(0.45_0.14_155)]">Operational</span>
-          </span>
-        </div>
+        <h2 className="font-display text-2xl tracking-tight">All clients</h2>
 
         {clientsQ.isLoading ? (
           <Card className="p-6 text-sm text-muted-foreground">Loading…</Card>
@@ -330,8 +407,14 @@ function AdminDashboard() {
                               <StatusBadge status={p.status} />
                             </div>
                           </div>
-                          <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
-                            <span>{p.progress}%</span>
+                          <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                            <span className="tabular-nums">{p.progress}%</span>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditProject(p)} aria-label="Edit">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingId(p.id)} aria-label="Delete">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         </li>
                       ))}
