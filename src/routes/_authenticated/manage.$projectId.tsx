@@ -52,11 +52,11 @@ const TABS = [
   { id: "products", label: "מוצרים", icon: Package, table: "products" as const },
   { id: "categories", label: "קטגוריות", icon: Tags, table: "categories" as const },
   { id: "orders", label: "הזמנות", icon: ShoppingCart, table: "orders" as const },
-  { id: "customers", label: "לקוחות", icon: Users, table: "customers" as const },
+  { id: "customers", label: "לקוחות", icon: Users, table: "profiles" as const },
   { id: "coupons", label: "קופונים", icon: Ticket, table: "coupons" as const },
   { id: "reports", label: "דוחות", icon: BarChart3, table: null },
-  { id: "notifications", label: "הודעות", icon: Bell, table: "notifications" as const },
-  { id: "settings", label: "הגדרות", icon: Settings, table: "settings" as const },
+  { id: "notifications", label: "ניוזלטר", icon: Bell, table: "newsletter_subscribers" as const },
+  { id: "settings", label: "הגדרות", icon: Settings, table: "site_settings" as const },
 ] as const;
 
 function ManageProject() {
