@@ -1,0 +1,23 @@
+// Server-side admin client for external Supabase - bypasses RLS.
+// Use only in server functions / server routes.
+import { createClient } from '@supabase/supabase-js';
+
+function createAdminClient() {
+  const URL = process.env.EXTERNAL_DB_URL;
+  const KEY = process.env.EXTERNAL_DB_SERVICE_ROLE_KEY;
+  if (!URL || !KEY) {
+    throw new Error('Missing EXTERNAL_DB_URL or EXTERNAL_DB_SERVICE_ROLE_KEY');
+  }
+  return createClient(URL, KEY, {
+    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+  });
+}
+
+let _admin: ReturnType<typeof createAdminClient> | undefined;
+
+export const supabaseAdmin = new Proxy({} as ReturnType<typeof createAdminClient>, {
+  get(_, prop, receiver) {
+    if (!_admin) _admin = createAdminClient();
+    return Reflect.get(_admin, prop, receiver);
+  },
+});
