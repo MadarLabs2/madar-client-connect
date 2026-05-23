@@ -52,11 +52,11 @@ const TABS = [
   { id: "products", label: "מוצרים", icon: Package, table: "products" as const },
   { id: "categories", label: "קטגוריות", icon: Tags, table: "categories" as const },
   { id: "orders", label: "הזמנות", icon: ShoppingCart, table: "orders" as const },
-  { id: "customers", label: "לקוחות", icon: Users, table: "customers" as const },
+  { id: "customers", label: "לקוחות", icon: Users, table: "profiles" as const },
   { id: "coupons", label: "קופונים", icon: Ticket, table: "coupons" as const },
   { id: "reports", label: "דוחות", icon: BarChart3, table: null },
-  { id: "notifications", label: "הודעות", icon: Bell, table: "notifications" as const },
-  { id: "settings", label: "הגדרות", icon: Settings, table: "settings" as const },
+  { id: "notifications", label: "ניוזלטר", icon: Bell, table: "newsletter_subscribers" as const },
+  { id: "settings", label: "הגדרות", icon: Settings, table: "site_settings" as const },
 ] as const;
 
 function ManageProject() {
@@ -169,8 +169,8 @@ function Reports({ projectId }: { projectId: string }) {
     queryFn: () => listFn({ data: { projectId, table: "products", limit: 500 } }),
   });
   const { data: customersRes } = useQuery({
-    queryKey: ["pdb", projectId, "customers"],
-    queryFn: () => listFn({ data: { projectId, table: "customers", limit: 500 } }),
+    queryKey: ["pdb", projectId, "profiles"],
+    queryFn: () => listFn({ data: { projectId, table: "profiles", limit: 500 } }),
   });
 
   const orders = ordersRes?.rows ?? [];
@@ -206,7 +206,7 @@ function Reports({ projectId }: { projectId: string }) {
   );
 }
 
-type Table = "products" | "categories" | "orders" | "customers" | "coupons" | "notifications" | "settings";
+type Table = "products" | "categories" | "orders" | "profiles" | "coupons" | "newsletter_subscribers" | "site_settings";
 
 function ResourceTable({ projectId, table, label }: { projectId: string; table: Table; label: string }) {
   const qc = useQueryClient();

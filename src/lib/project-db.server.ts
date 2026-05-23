@@ -30,9 +30,10 @@ export const ALLOWED_TABLES = [
   "products",
   "categories",
   "orders",
-  "customers",
+  "order_items",
+  "profiles",
   "coupons",
-  "notifications",
-  "settings",
+  "newsletter_subscribers",
+  "site_settings",
 ] as const;
 export type AllowedTable = (typeof ALLOWED_TABLES)[number];
