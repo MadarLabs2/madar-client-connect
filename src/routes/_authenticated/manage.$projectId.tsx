@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { ProductsManager } from "@/components/manage/ProductsManager";
 import { CategoriesManager } from "@/components/manage/CategoriesManager";
 import { OrdersManager } from "@/components/manage/OrdersManager";
+import { CustomersManager } from "@/components/manage/CustomersManager";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -132,6 +133,8 @@ function ManageProject() {
           <CategoriesManager projectId={projectId} />
         ) : activeTab.id === "orders" ? (
           <OrdersManager projectId={projectId} />
+        ) : activeTab.id === "customers" ? (
+          <CustomersManager projectId={projectId} />
         ) : (
           <ResourceTable projectId={projectId} table={activeTab.table!} label={activeTab.label} />
         )}
