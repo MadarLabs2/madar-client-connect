@@ -556,7 +556,13 @@ function AdminDashboard() {
                           </div>
                           <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                             <span className="tabular-nums">{p.progress}%</span>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setProductsProject(p)} aria-label="Manage products">
+                            <Button asChild size="sm" variant="default" className="h-8 gap-1.5">
+                              <Link to="/manage/$projectId" params={{ projectId: p.id }}>
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                ניהול
+                              </Link>
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setProductsProject(p)} aria-label="עריכת JSON של מוצרים">
                               <Package className="h-3.5 w-3.5" />
                             </Button>
                             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditProject(p)} aria-label="Edit">
