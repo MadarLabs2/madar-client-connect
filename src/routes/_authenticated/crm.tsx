@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
 import {
   listLeads,
   getLead,
@@ -69,38 +70,18 @@ type ActivityType = "call" | "meeting" | "email" | "task" | "note";
 type CommChannel = "phone" | "email" | "whatsapp" | "meeting" | "other";
 type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "cancelled";
 
-const STAGES: { key: Stage; label: string; color: string }[] = [
-  { key: "new", label: "חדש", color: "bg-slate-500" },
-  { key: "contacted", label: "יצרנו קשר", color: "bg-blue-500" },
-  { key: "qualified", label: "מתאים", color: "bg-indigo-500" },
-  { key: "proposal", label: "הצעה נשלחה", color: "bg-amber-500" },
-  { key: "won", label: "סגור", color: "bg-emerald-600" },
-  { key: "lost", label: "אבוד", color: "bg-rose-500" },
+const STAGES: { key: Stage; color: string }[] = [
+  { key: "new", color: "bg-slate-500" },
+  { key: "contacted", color: "bg-blue-500" },
+  { key: "qualified", color: "bg-indigo-500" },
+  { key: "proposal", color: "bg-amber-500" },
+  { key: "won", color: "bg-emerald-600" },
+  { key: "lost", color: "bg-rose-500" },
 ];
 
-const ACTIVITY_LABEL: Record<ActivityType, string> = {
-  call: "שיחה",
-  meeting: "פגישה",
-  email: "אימייל",
-  task: "משימה",
-  note: "הערה",
-};
-
-const CHANNEL_LABEL: Record<CommChannel, string> = {
-  phone: "טלפון",
-  email: "אימייל",
-  whatsapp: "וואטסאפ",
-  meeting: "פגישה",
-  other: "אחר",
-};
-
-const INVOICE_LABEL: Record<InvoiceStatus, string> = {
-  draft: "טיוטה",
-  sent: "נשלחה",
-  paid: "שולמה",
-  overdue: "באיחור",
-  cancelled: "בוטלה",
-};
+const ACTIVITY_TYPES: ActivityType[] = ["call", "meeting", "email", "task", "note"];
+const CHANNEL_TYPES: CommChannel[] = ["phone", "email", "whatsapp", "meeting", "other"];
+const INVOICE_STATUSES: InvoiceStatus[] = ["draft", "sent", "paid", "overdue", "cancelled"];
 
 type LeadRow = {
   id: string;
