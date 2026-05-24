@@ -14,6 +14,192 @@ export type Database = {
   }
   public: {
     Tables: {
+      lead_activities: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          lead_id: string
+          title: string
+          type: Database["public"]["Enums"]["activity_type"]
+          updated_at: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          lead_id: string
+          title: string
+          type?: Database["public"]["Enums"]["activity_type"]
+          updated_at?: string
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          lead_id?: string
+          title?: string
+          type?: Database["public"]["Enums"]["activity_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_activities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_communications: {
+        Row: {
+          channel: Database["public"]["Enums"]["comm_channel"]
+          content: string
+          created_at: string
+          direction: Database["public"]["Enums"]["comm_direction"]
+          id: string
+          lead_id: string
+          occurred_at: string
+        }
+        Insert: {
+          channel?: Database["public"]["Enums"]["comm_channel"]
+          content: string
+          created_at?: string
+          direction?: Database["public"]["Enums"]["comm_direction"]
+          id?: string
+          lead_id: string
+          occurred_at?: string
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["comm_channel"]
+          content?: string
+          created_at?: string
+          direction?: Database["public"]["Enums"]["comm_direction"]
+          id?: string
+          lead_id?: string
+          occurred_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_communications_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_invoices: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          due_date: string | null
+          id: string
+          issued_at: string | null
+          lead_id: string
+          notes: string | null
+          number: string | null
+          paid_at: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          due_date?: string | null
+          id?: string
+          issued_at?: string | null
+          lead_id: string
+          notes?: string | null
+          number?: string | null
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          due_date?: string | null
+          id?: string
+          issued_at?: string | null
+          lead_id?: string
+          notes?: string | null
+          number?: string | null
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_invoices_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          company: string | null
+          created_at: string
+          currency: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          owner_id: string | null
+          phone: string | null
+          source: string | null
+          stage: Database["public"]["Enums"]["lead_stage"]
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          currency?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          owner_id?: string | null
+          phone?: string | null
+          source?: string | null
+          stage?: Database["public"]["Enums"]["lead_stage"]
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          currency?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          owner_id?: string | null
+          phone?: string | null
+          source?: string | null
+          stage?: Database["public"]["Enums"]["lead_stage"]
+          updated_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           created_at: string
@@ -153,7 +339,18 @@ export type Database = {
       }
     }
     Enums: {
+      activity_type: "call" | "meeting" | "email" | "task" | "note"
       app_role: "admin" | "client"
+      comm_channel: "phone" | "email" | "whatsapp" | "meeting" | "other"
+      comm_direction: "in" | "out"
+      invoice_status: "draft" | "sent" | "paid" | "overdue" | "cancelled"
+      lead_stage:
+        | "new"
+        | "contacted"
+        | "qualified"
+        | "proposal"
+        | "won"
+        | "lost"
       project_status: "planning" | "in_progress" | "review" | "live" | "paused"
       project_type:
         | "website"
@@ -288,7 +485,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      activity_type: ["call", "meeting", "email", "task", "note"],
       app_role: ["admin", "client"],
+      comm_channel: ["phone", "email", "whatsapp", "meeting", "other"],
+      comm_direction: ["in", "out"],
+      invoice_status: ["draft", "sent", "paid", "overdue", "cancelled"],
+      lead_stage: ["new", "contacted", "qualified", "proposal", "won", "lost"],
       project_status: ["planning", "in_progress", "review", "live", "paused"],
       project_type: [
         "website",
