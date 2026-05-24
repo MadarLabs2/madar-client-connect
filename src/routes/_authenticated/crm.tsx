@@ -314,7 +314,7 @@ function CrmPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">{l.name}</span>
                     <Badge className={`${STAGES.find((s) => s.key === l.stage)?.color} text-white text-[10px]`}>
-                      {STAGES.find((s) => s.key === l.stage)?.label}
+                      {stageLabel(l.stage)}
                     </Badge>
                   </div>
                   <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
@@ -633,7 +633,7 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
                   <DialogDescription className="flex items-center gap-3 mt-1">
                     {lead.company && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{lead.company}</span>}
                     <Badge className={`${STAGES.find((s) => s.key === lead.stage)?.color} text-white`}>
-                      {STAGES.find((s) => s.key === lead.stage)?.label}
+                      {stageLabel(lead.stage)}
                     </Badge>
                     <span className="tabular-nums font-medium">{fmt(Number(lead.value), lead.currency)}</span>
                   </DialogDescription>
