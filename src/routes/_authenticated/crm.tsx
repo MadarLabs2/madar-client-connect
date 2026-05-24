@@ -111,6 +111,11 @@ const emptyLead = {
 
 function CrmPage() {
   const { role } = useAuth();
+  const { t } = useI18n();
+  const ACTIVITY_LABEL: Record<ActivityType, string> = { call: t("act.call"), meeting: t("act.meeting"), email: t("act.email"), task: t("act.task"), note: t("act.note") };
+  const CHANNEL_LABEL: Record<CommChannel, string> = { phone: t("chan.phone"), email: t("chan.email"), whatsapp: t("chan.whatsapp"), meeting: t("chan.meeting"), other: t("chan.other") };
+  const INVOICE_LABEL: Record<InvoiceStatus, string> = { draft: t("inv.draft"), sent: t("inv.sent"), paid: t("inv.paid"), overdue: t("inv.overdue"), cancelled: t("inv.cancelled") };
+  const stageLabel = (k: Stage) => t(`stage.${k}`);
   const qc = useQueryClient();
   const fetchOverview = useServerFn(getCrmOverview);
   const fetchLeads = useServerFn(listLeads);
