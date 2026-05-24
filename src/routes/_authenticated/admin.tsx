@@ -108,6 +108,7 @@ const emptyProjectForm: ProjectForm = {
 
 function AdminDashboard() {
   const { role } = useAuth();
+  const { t } = useI18n();
   const qc = useQueryClient();
   const invite = useServerFn(inviteClient);
   const editClient = useServerFn(updateClient);
