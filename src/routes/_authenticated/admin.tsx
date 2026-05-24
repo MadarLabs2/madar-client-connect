@@ -489,53 +489,53 @@ function AdminDashboard() {
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         {[
-          { label: "Clients", value: metrics.clients },
-          { label: "Active projects", value: metrics.active },
-          { label: "Live products", value: metrics.live },
-          { label: "Total projects", value: metrics.total },
+          { label: t("admin.clients"), value: metrics.clients },
+          { label: t("admin.activeProjects"), value: metrics.active },
+          { label: t("admin.liveProducts"), value: metrics.live },
+          { label: t("admin.totalProjects"), value: metrics.total },
         ].map((m) => (
-          <Card key={m.label} className="p-5">
-            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{m.label}</div>
+          <Card key={m.label} className="p-5 shadow-card">
+            <div className="text-xs font-medium uppercase tracking-[0.15em] text-muted-foreground">{m.label}</div>
             <div className="mt-2 font-display text-3xl tracking-tight">{m.value}</div>
           </Card>
         ))}
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-display text-2xl tracking-tight">All clients</h2>
+        <h2 className="font-display text-2xl tracking-tight">{t("admin.allClients")}</h2>
 
         {clientsQ.isLoading ? (
-          <Card className="p-6 text-sm text-muted-foreground">Loading…</Card>
+          <Card className="p-6 text-sm text-muted-foreground">{t("admin.loading")}</Card>
         ) : clients.length === 0 ? (
           <Card className="p-6 text-sm text-muted-foreground">
-            No clients yet. Click <span className="font-medium">Add new client</span> to invite one.
+            {t("admin.noClients")} <span className="font-medium">{t("admin.addClient")}</span> {t("admin.toInvite")}
           </Card>
         ) : (
           <div className="space-y-3">
             {clients.map((c) => {
               const cp = projectsByClient[c.id] ?? [];
               return (
-                <Card key={c.id} className="overflow-hidden p-0">
+                <Card key={c.id} className="overflow-hidden p-0 shadow-card">
                   <div className="flex flex-wrap items-center gap-4 border-b border-border px-5 py-4 sm:flex-nowrap">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span className="truncate text-base font-semibold text-foreground">{c.company || "—"}</span>
                         <span className="text-sm text-muted-foreground">·</span>
-                        <span className="truncate text-sm text-muted-foreground">{c.name || "(no name)"}</span>
+                        <span className="truncate text-sm text-muted-foreground">{c.name || t("admin.noName")}</span>
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                      <span>{cp.length} project{cp.length === 1 ? "" : "s"}</span>
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditClient(c)} aria-label="Edit client">
+                      <span>{cp.length} {cp.length === 1 ? t("admin.projectCount") : t("admin.projectsCount")}</span>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditClient(c)} aria-label={t("admin.editAria")}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingClientId(c.id)} aria-label="Delete client">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingClientId(c.id)} aria-label={t("admin.deleteAria")}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
                   {cp.length === 0 ? (
-                    <div className="px-5 py-4 text-sm text-muted-foreground">No projects assigned yet.</div>
+                    <div className="px-5 py-4 text-sm text-muted-foreground">{t("admin.noProjects")}</div>
                   ) : (
                     <ul className="divide-y divide-border">
                       {cp.map((p) => (
@@ -555,16 +555,16 @@ function AdminDashboard() {
                           </div>
                           <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                             <span className="tabular-nums">{p.progress}%</span>
-                            <Button asChild size="sm" variant="default" className="h-8 gap-1.5">
+                            <Button asChild size="sm" variant="default" className="h-8 gap-1.5 bg-gradient-primary">
                               <Link to="/manage/$projectId" params={{ projectId: p.id }}>
                                 <ExternalLink className="h-3.5 w-3.5" />
-                                ניהול
+                                {t("admin.manage")}
                               </Link>
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditProject(p)} aria-label="Edit">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditProject(p)} aria-label={t("admin.editAria")}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingId(p.id)} aria-label="Delete">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingId(p.id)} aria-label={t("admin.deleteAria")}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
