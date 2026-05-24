@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { toast } from "sonner";
+import madarLogo from "@/assets/madar-logo.png";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -54,9 +55,11 @@ function LoginPage() {
       {/* Brand panel */}
       <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-primary p-12 text-primary-foreground lg:flex">
         <div className="flex items-center gap-3">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent/90 text-accent-foreground shadow-glow">
-            <span className="font-display text-xl leading-none">M</span>
-          </span>
+          <img
+            src={madarLogo}
+            alt={t("app.name")}
+            className="h-14 w-14 rounded-full bg-white object-cover p-1 shadow-glow ring-1 ring-white/30"
+          />
           <span className="font-display text-3xl tracking-tight">{t("app.name")}</span>
         </div>
 
@@ -94,10 +97,12 @@ function LoginPage() {
           <LanguageSwitcher />
         </div>
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-primary text-primary-foreground">
-              <span className="font-display text-lg leading-none">M</span>
-            </span>
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            <img
+              src={madarLogo}
+              alt={t("app.name")}
+              className="h-12 w-12 rounded-full object-cover shadow-elegant ring-1 ring-border/60"
+            />
             <span className="font-display text-3xl tracking-tight">{t("app.name")}</span>
           </div>
 
