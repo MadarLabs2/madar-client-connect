@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { LogOut } from "lucide-react";
+import madarLogo from "@/assets/madar-logo.png";
 
 export function Header() {
   const { user, profile, role, signOut } = useAuth();
@@ -13,17 +14,17 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 glass">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-        <Link to="/" className="group flex items-center gap-2.5">
-          <span
-            aria-hidden
-            className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-primary text-primary-foreground shadow-elegant transition-transform group-hover:scale-105"
-          >
-            <span className="font-display text-lg leading-none">M</span>
-          </span>
+        <Link to="/" className="group flex items-center gap-3">
+          <img
+            src={madarLogo}
+            alt={t("app.name")}
+            className="h-10 w-10 rounded-full object-cover shadow-elegant ring-1 ring-border/60 transition-transform group-hover:scale-105"
+          />
           <span className="font-display text-2xl tracking-tight text-foreground">
             {t("app.name")}
           </span>
         </Link>
+
 
         <div className="flex items-center gap-1.5 sm:gap-2">
           <LanguageSwitcher />

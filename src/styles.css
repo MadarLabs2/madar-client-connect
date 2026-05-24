@@ -59,7 +59,7 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.16 0.018 260);
 
-  --primary: oklch(0.2 0.025 260);
+  --primary: oklch(0.32 0.08 255);          /* Madar navy */
   --primary-foreground: oklch(0.985 0.005 80);
 
   --secondary: oklch(0.96 0.008 80);
@@ -100,8 +100,8 @@
   --sidebar-border: oklch(0.9 0.008 80);
   --sidebar-ring: oklch(0.78 0.14 75);
 
-  --gradient-primary: linear-gradient(135deg, oklch(0.2 0.025 260), oklch(0.32 0.04 270));
-  --gradient-accent: linear-gradient(135deg, oklch(0.78 0.14 75), oklch(0.86 0.16 78));
+  --gradient-primary: linear-gradient(135deg, oklch(0.28 0.08 255), oklch(0.42 0.09 255));
+  --gradient-accent: linear-gradient(135deg, oklch(0.74 0.13 75), oklch(0.86 0.16 78));
   --gradient-mesh: radial-gradient(ellipse at top left, oklch(0.78 0.14 75 / 0.15), transparent 50%),
                     radial-gradient(ellipse at bottom right, oklch(0.55 0.12 260 / 0.12), transparent 55%);
   --shadow-elegant: 0 10px 40px -12px oklch(0.2 0.025 260 / 0.18);
