@@ -16,6 +16,10 @@ async function assertAdmin(userId: string) {
 }
 
 const LEAD_STAGES = ["new", "contacted", "qualified", "proposal", "won", "lost"] as const;
+const ACTIVITY_TYPES = ["call", "meeting", "email", "task", "note"] as const;
+const COMM_CHANNELS = ["phone", "email", "whatsapp", "meeting", "other"] as const;
+const COMM_DIRECTIONS = ["in", "out"] as const;
+const INVOICE_STATUSES = ["draft", "sent", "paid", "overdue", "cancelled"] as const;
 
 // ============ Leads ============
 
@@ -115,7 +119,7 @@ export const deleteLead = createServerFn({ method: "POST" })
 const UpsertActivitySchema = z.object({
   id: z.string().uuid().optional(),
   lead_id: z.string().uuid(),
-  type: z.enum(["call", "meeting", "email", "task", "note"]),
+  type: z.enum(ACTIVITY_TYPES),
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional().or(z.literal("")),
   due_date: z.string().nullable().optional(),
@@ -173,4 +177,123 @@ export const deleteActivity = createServerFn({ method: "POST" })
 
 const AddCommSchema = z.object({
   lead_id: z.string().uuid(),
-  channel: z.enum(["phone", "email",
+  channel: z.enum(COMM_CHANNELS),
+  direction: z.enum(COMM_DIRECTIONS),
+  content: z.string().min(1).max(5000),
+  occurred_at: z.string().optional(),
+});
+
+export const addCommunication = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => AddCommSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await cloudAdmin.from("lead_communications").insert({
+      lead_id: data.lead_id,
+      channel: data.channel,
+      direction: data.direction,
+      content: data.content,
+      occurred_at: data.occurred_at || new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteCommunication = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await cloudAdmin.from("lead_communications").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ============ Invoices ============
+
+const UpsertInvoiceSchema = z.object({
+  id: z.string().uuid().optional(),
+  lead_id: z.string().uuid(),
+  number: z.string().max(50).optional().or(z.literal("")),
+  amount: z.number().min(0).max(99999999),
+  currency: z.string().min(1).max(10),
+  status: z.enum(INVOICE_STATUSES),
+  issued_at: z.string().nullable().optional(),
+  due_date: z.string().nullable().optional(),
+  paid_at: z.string().nullable().optional(),
+  notes: z.string().max(2000).optional().or(z.literal("")),
+});
+
+export const upsertInvoice = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => UpsertInvoiceSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const payload = {
+      lead_id: data.lead_id,
+      number: data.number || null,
+      amount: data.amount,
+      currency: data.currency,
+      status: data.status,
+      issued_at: data.issued_at || null,
+      due_date: data.due_date || null,
+      paid_at: data.paid_at || (data.status === "paid" ? new Date().toISOString() : null),
+      notes: data.notes || null,
+    };
+    if (data.id) {
+      const { error } = await cloudAdmin.from("lead_invoices").update(payload).eq("id", data.id);
+      if (error) throw new Error(error.message);
+      return { ok: true, id: data.id };
+    }
+    const { data: created, error } = await cloudAdmin.from("lead_invoices").insert(payload).select("id").single();
+    if (error) throw new Error(error.message);
+    return { ok: true, id: created.id };
+  });
+
+export const deleteInvoice = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await cloudAdmin.from("lead_invoices").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ============ Dashboard aggregate ============
+
+export const getCrmOverview = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [leadsR, paidR, openInvR, todayActR, recentActR, recentCommR] = await Promise.all([
+      cloudAdmin.from("leads").select("id,name,company,stage,value,currency,created_at").order("created_at", { ascending: false }),
+      cloudAdmin.from("lead_invoices").select("amount,currency,status,paid_at"),
+      cloudAdmin.from("lead_invoices").select("amount,currency,status").in("status", ["sent", "overdue"]),
+      cloudAdmin
+        .from("lead_activities")
+        .select("id,lead_id,type,title,due_date,completed")
+        .eq("completed", false)
+        .lt("due_date", tomorrow.toISOString())
+        .order("due_date", { ascending: true }),
+      cloudAdmin.from("lead_activities").select("id,lead_id,type,title,created_at,completed").order("created_at", { ascending: false }).limit(8),
+      cloudAdmin.from("lead_communications").select("id,lead_id,channel,direction,content,occurred_at").order("occurred_at", { ascending: false }).limit(8),
+    ]);
+
+    if (leadsR.error) throw new Error(leadsR.error.message);
+    return {
+      leads: leadsR.data ?? [],
+      invoices: {
+        paid: paidR.data ?? [],
+        open: openInvR.data ?? [],
+      },
+      todayTasks: todayActR.data ?? [],
+      recentActivities: recentActR.data ?? [],
+      recentCommunications: recentCommR.data ?? [],
+    };
+  });
