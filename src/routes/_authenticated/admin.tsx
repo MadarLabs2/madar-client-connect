@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/external-db/client";
 import {
   inviteClient,
@@ -107,6 +108,7 @@ const emptyProjectForm: ProjectForm = {
 
 function AdminDashboard() {
   const { role } = useAuth();
+  const { t } = useI18n();
   const qc = useQueryClient();
   const invite = useServerFn(inviteClient);
   const editClient = useServerFn(updateClient);
@@ -203,17 +205,17 @@ function AdminDashboard() {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name || !form.company || !form.email || form.password.length < 8) {
-      toast.error("All fields required (password ≥ 8 chars)");
+      toast.error(t("admin.allFieldsRequired"));
       return;
     }
     try {
       await invite({ data: form });
-      toast.success(`Client created · ${form.email}`);
+      toast.success(`${t("admin.clientCreated")} ${form.email}`);
       setClientOpen(false);
       setForm({ name: "", company: "", email: "", password: randomPassword() });
       qc.invalidateQueries({ queryKey: ["admin-clients"] });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create client");
+      toast.error(err instanceof Error ? err.message : t("admin.failedCreate"));
     }
   }
 
@@ -222,11 +224,11 @@ function AdminDashboard() {
     if (!editingClient) return;
     try {
       await editClient({ data: { id: editingClient.id, ...clientEditForm } });
-      toast.success("Client updated");
+      toast.success(t("admin.clientUpdated"));
       setEditingClient(null);
       qc.invalidateQueries({ queryKey: ["admin-clients"] });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update");
+      toast.error(err instanceof Error ? err.message : t("admin.failedUpdate"));
     }
   }
 
@@ -234,35 +236,35 @@ function AdminDashboard() {
     if (!deletingClientId) return;
     try {
       await removeClient({ data: { id: deletingClientId } });
-      toast.success("Client deleted");
+      toast.success(t("admin.clientDeleted"));
       setDeletingClientId(null);
       qc.invalidateQueries({ queryKey: ["admin-clients"] });
       qc.invalidateQueries({ queryKey: ["admin-projects"] });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete");
+      toast.error(err instanceof Error ? err.message : t("admin.failedDelete"));
     }
   }
 
   async function handleSaveProject(e: React.FormEvent) {
     e.preventDefault();
     if (!pForm.clientId || !pForm.name) {
-      toast.error("Pick a client and enter a project name");
+      toast.error(t("admin.pickClient"));
       return;
     }
     try {
       if (editingId) {
         await editProject({ data: { ...pForm, id: editingId } });
-        toast.success("Project updated");
+        toast.success(t("admin.projectUpdated"));
       } else {
         await addProject({ data: pForm });
-        toast.success("Project created");
+        toast.success(t("admin.projectCreated"));
       }
       setProjOpen(false);
       setEditingId(null);
       setPForm(emptyProjectForm);
       qc.invalidateQueries({ queryKey: ["admin-projects"] });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save project");
+      toast.error(err instanceof Error ? err.message : t("admin.failedSaveProject"));
     }
   }
 
@@ -270,11 +272,11 @@ function AdminDashboard() {
     if (!deletingId) return;
     try {
       await removeProject({ data: { id: deletingId } });
-      toast.success("Project deleted");
+      toast.success(t("admin.projectDeleted"));
       setDeletingId(null);
       qc.invalidateQueries({ queryKey: ["admin-projects"] });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete");
+      toast.error(err instanceof Error ? err.message : t("admin.failedDelete"));
     }
   }
 
@@ -282,51 +284,49 @@ function AdminDashboard() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Admin · Master view
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            {t("admin.kicker")}
           </p>
-          <h1 className="mt-1 font-display text-4xl tracking-tight">Client portfolio</h1>
+          <h1 className="mt-1 font-display text-4xl tracking-tight">{t("admin.title")}</h1>
         </div>
-        <div className="flex gap-2">
-          <Button asChild variant="default" className="bg-primary">
-            <Link to="/crm">CRM</Link>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="default" className="bg-gradient-primary">
+            <Link to="/crm">{t("admin.crmBtn")}</Link>
           </Button>
-          <Button variant="outline" onClick={openNewProject}>New project</Button>
+          <Button variant="outline" onClick={openNewProject}>{t("admin.newProject")}</Button>
           <Dialog open={clientOpen} onOpenChange={setClientOpen}>
             <DialogTrigger asChild>
-              <Button>Add new client</Button>
+              <Button className="bg-gradient-primary">{t("admin.addClient")}</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>New client account</DialogTitle>
-                <DialogDescription>
-                  Generates login credentials. The client can sign in immediately.
-                </DialogDescription>
+                <DialogTitle>{t("admin.newClient.title")}</DialogTitle>
+                <DialogDescription>{t("admin.newClient.desc")}</DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAdd} className="space-y-4">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="n">Contact name</Label>
+                  <Label htmlFor="n">{t("admin.contactName")}</Label>
                   <Input id="n" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="c">Company</Label>
+                  <Label htmlFor="c">{t("admin.company")}</Label>
                   <Input id="c" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="e">Email</Label>
+                  <Label htmlFor="e">{t("admin.email")}</Label>
                   <Input id="e" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="p">Temporary password</Label>
+                  <Label htmlFor="p">{t("admin.tempPassword")}</Label>
                   <div className="flex gap-2">
                     <Input id="p" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
                     <Button type="button" variant="outline" onClick={() => setForm({ ...form, password: randomPassword() })}>
-                      Regenerate
+                      {t("admin.regen")}
                     </Button>
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button type="submit">Create client</Button>
+                  <Button type="submit">{t("admin.createClient")}</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -338,16 +338,16 @@ function AdminDashboard() {
       <Dialog open={projOpen} onOpenChange={(o) => { setProjOpen(o); if (!o) setEditingId(null); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Edit project" : "Create project"}</DialogTitle>
+            <DialogTitle>{editingId ? t("admin.editProject") : t("admin.createProject")}</DialogTitle>
             <DialogDescription>
-              {editingId ? "Update project details and DB connection." : "Assign a new project to a client."}
+              {editingId ? t("admin.editProjectDesc") : t("admin.createProjectDesc")}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveProject} className="space-y-4">
             <div className="grid gap-1.5">
-              <Label>Client</Label>
+              <Label>{t("admin.client")}</Label>
               <Select value={pForm.clientId} onValueChange={(v) => setPForm({ ...pForm, clientId: v })}>
-                <SelectTrigger><SelectValue placeholder="Choose a client" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("admin.chooseClient")} /></SelectTrigger>
                 <SelectContent>
                   {clients.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.company} — {c.name}</SelectItem>
@@ -356,73 +356,73 @@ function AdminDashboard() {
               </Select>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="pn">Project name</Label>
+              <Label htmlFor="pn">{t("admin.projectName")}</Label>
               <Input id="pn" value={pForm.name} onChange={(e) => setPForm({ ...pForm, name: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
-                <Label>Type</Label>
+                <Label>{t("admin.type")}</Label>
                 <Select value={pForm.type} onValueChange={(v) => setPForm({ ...pForm, type: v as ProjectType })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {PROJECT_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>{t.replace("_", " ")}</SelectItem>
+                    {PROJECT_TYPES.map((ty) => (
+                      <SelectItem key={ty} value={ty}>{ty.replace("_", " ")}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-1.5">
-                <Label>Status</Label>
+                <Label>{t("admin.status")}</Label>
                 <Select value={pForm.status} onValueChange={(v) => setPForm({ ...pForm, status: v as ProjectStatus })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {PROJECT_STATUSES.map((t) => (
-                      <SelectItem key={t} value={t}>{t.replace("_", " ")}</SelectItem>
+                    {PROJECT_STATUSES.map((st) => (
+                      <SelectItem key={st} value={st}>{t(`status.${st}`)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="pp">Progress (%)</Label>
+              <Label htmlFor="pp">{t("admin.progressPct")}</Label>
               <Input id="pp" type="number" min={0} max={100} value={pForm.progress}
                 onChange={(e) => setPForm({ ...pForm, progress: Number(e.target.value) })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
-                <Label htmlFor="pl">Live URL</Label>
+                <Label htmlFor="pl">{t("admin.liveUrl")}</Label>
                 <Input id="pl" placeholder="https://…" value={pForm.liveUrl} onChange={(e) => setPForm({ ...pForm, liveUrl: e.target.value })} />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="pc">CMS URL</Label>
+                <Label htmlFor="pc">{t("admin.cmsUrl")}</Label>
                 <Input id="pc" placeholder="https://…" value={pForm.cmsUrl} onChange={(e) => setPForm({ ...pForm, cmsUrl: e.target.value })} />
               </div>
             </div>
 
             <div className="space-y-3 rounded-md border border-border bg-muted/30 p-4">
               <div className="flex items-center gap-2 text-sm font-medium">
-                <Database className="h-4 w-4" /> Project DB connection (optional)
+                <Database className="h-4 w-4" /> {t("admin.dbConn")}
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="su">Supabase URL</Label>
+                <Label htmlFor="su">{t("admin.dbUrl")}</Label>
                 <Input id="su" placeholder="https://xxx.supabase.co" value={pForm.supabaseUrl}
                   onChange={(e) => setPForm({ ...pForm, supabaseUrl: e.target.value })} />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="sa">Anon (publishable) key</Label>
+                <Label htmlFor="sa">{t("admin.anonKey")}</Label>
                 <Input id="sa" value={pForm.supabaseAnonKey}
                   onChange={(e) => setPForm({ ...pForm, supabaseAnonKey: e.target.value })} />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="ss">Service role key</Label>
+                <Label htmlFor="ss">{t("admin.serviceKey")}</Label>
                 <Input id="ss" type="password" value={pForm.supabaseServiceKey}
                   onChange={(e) => setPForm({ ...pForm, supabaseServiceKey: e.target.value })} />
-                <p className="text-xs text-muted-foreground">Stored encrypted at rest. Only admins can read it.</p>
+                <p className="text-xs text-muted-foreground">{t("admin.serviceKeyHint")}</p>
               </div>
             </div>
 
             <DialogFooter>
-              <Button type="submit">{editingId ? "Save changes" : "Create project"}</Button>
+              <Button type="submit">{editingId ? t("admin.save") : t("admin.createProject")}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -432,21 +432,21 @@ function AdminDashboard() {
       <Dialog open={!!editingClient} onOpenChange={(o) => !o && setEditingClient(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit client</DialogTitle>
-            <DialogDescription>Update name and company.</DialogDescription>
+            <DialogTitle>{t("admin.editClient")}</DialogTitle>
+            <DialogDescription>{t("admin.editClientDesc")}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveClient} className="space-y-4">
             <div className="grid gap-1.5">
-              <Label htmlFor="ecn">Contact name</Label>
+              <Label htmlFor="ecn">{t("admin.contactName")}</Label>
               <Input id="ecn" value={clientEditForm.name}
                 onChange={(e) => setClientEditForm({ ...clientEditForm, name: e.target.value })} />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="ecc">Company</Label>
+              <Label htmlFor="ecc">{t("admin.company")}</Label>
               <Input id="ecc" value={clientEditForm.company}
                 onChange={(e) => setClientEditForm({ ...clientEditForm, company: e.target.value })} />
             </div>
-            <DialogFooter><Button type="submit">Save</Button></DialogFooter>
+            <DialogFooter><Button type="submit">{t("admin.saveBtn")}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
@@ -455,14 +455,12 @@ function AdminDashboard() {
       <AlertDialog open={!!deletingId} onOpenChange={(o) => !o && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete project?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This cannot be undone. The project and its products will be permanently removed.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t("admin.deleteProject")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("admin.deleteProjectDesc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+            <AlertDialogCancel>{t("admin.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{t("admin.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -471,14 +469,12 @@ function AdminDashboard() {
       <AlertDialog open={!!deletingClientId} onOpenChange={(o) => !o && setDeletingClientId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete client?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Deletes the user account, profile, projects, and all linked products. Cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t("admin.deleteClient")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("admin.deleteClientDesc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteClient}>Delete</AlertDialogAction>
+            <AlertDialogCancel>{t("admin.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteClient}>{t("admin.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -493,53 +489,53 @@ function AdminDashboard() {
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         {[
-          { label: "Clients", value: metrics.clients },
-          { label: "Active projects", value: metrics.active },
-          { label: "Live products", value: metrics.live },
-          { label: "Total projects", value: metrics.total },
+          { label: t("admin.clients"), value: metrics.clients },
+          { label: t("admin.activeProjects"), value: metrics.active },
+          { label: t("admin.liveProducts"), value: metrics.live },
+          { label: t("admin.totalProjects"), value: metrics.total },
         ].map((m) => (
-          <Card key={m.label} className="p-5">
-            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{m.label}</div>
+          <Card key={m.label} className="p-5 shadow-card">
+            <div className="text-xs font-medium uppercase tracking-[0.15em] text-muted-foreground">{m.label}</div>
             <div className="mt-2 font-display text-3xl tracking-tight">{m.value}</div>
           </Card>
         ))}
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-display text-2xl tracking-tight">All clients</h2>
+        <h2 className="font-display text-2xl tracking-tight">{t("admin.allClients")}</h2>
 
         {clientsQ.isLoading ? (
-          <Card className="p-6 text-sm text-muted-foreground">Loading…</Card>
+          <Card className="p-6 text-sm text-muted-foreground">{t("admin.loading")}</Card>
         ) : clients.length === 0 ? (
           <Card className="p-6 text-sm text-muted-foreground">
-            No clients yet. Click <span className="font-medium">Add new client</span> to invite one.
+            {t("admin.noClients")} <span className="font-medium">{t("admin.addClient")}</span> {t("admin.toInvite")}
           </Card>
         ) : (
           <div className="space-y-3">
             {clients.map((c) => {
               const cp = projectsByClient[c.id] ?? [];
               return (
-                <Card key={c.id} className="overflow-hidden p-0">
+                <Card key={c.id} className="overflow-hidden p-0 shadow-card">
                   <div className="flex flex-wrap items-center gap-4 border-b border-border px-5 py-4 sm:flex-nowrap">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span className="truncate text-base font-semibold text-foreground">{c.company || "—"}</span>
                         <span className="text-sm text-muted-foreground">·</span>
-                        <span className="truncate text-sm text-muted-foreground">{c.name || "(no name)"}</span>
+                        <span className="truncate text-sm text-muted-foreground">{c.name || t("admin.noName")}</span>
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                      <span>{cp.length} project{cp.length === 1 ? "" : "s"}</span>
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditClient(c)} aria-label="Edit client">
+                      <span>{cp.length} {cp.length === 1 ? t("admin.projectCount") : t("admin.projectsCount")}</span>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditClient(c)} aria-label={t("admin.editAria")}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingClientId(c.id)} aria-label="Delete client">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingClientId(c.id)} aria-label={t("admin.deleteAria")}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
                   {cp.length === 0 ? (
-                    <div className="px-5 py-4 text-sm text-muted-foreground">No projects assigned yet.</div>
+                    <div className="px-5 py-4 text-sm text-muted-foreground">{t("admin.noProjects")}</div>
                   ) : (
                     <ul className="divide-y divide-border">
                       {cp.map((p) => (
@@ -559,16 +555,16 @@ function AdminDashboard() {
                           </div>
                           <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                             <span className="tabular-nums">{p.progress}%</span>
-                            <Button asChild size="sm" variant="default" className="h-8 gap-1.5">
+                            <Button asChild size="sm" variant="default" className="h-8 gap-1.5 bg-gradient-primary">
                               <Link to="/manage/$projectId" params={{ projectId: p.id }}>
                                 <ExternalLink className="h-3.5 w-3.5" />
-                                ניהול
+                                {t("admin.manage")}
                               </Link>
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditProject(p)} aria-label="Edit">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditProject(p)} aria-label={t("admin.editAria")}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingId(p.id)} aria-label="Delete">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingId(p.id)} aria-label={t("admin.deleteAria")}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>

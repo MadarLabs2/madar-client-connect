@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
 import {
   listLeads,
   getLead,
@@ -69,38 +70,18 @@ type ActivityType = "call" | "meeting" | "email" | "task" | "note";
 type CommChannel = "phone" | "email" | "whatsapp" | "meeting" | "other";
 type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "cancelled";
 
-const STAGES: { key: Stage; label: string; color: string }[] = [
-  { key: "new", label: "חדש", color: "bg-slate-500" },
-  { key: "contacted", label: "יצרנו קשר", color: "bg-blue-500" },
-  { key: "qualified", label: "מתאים", color: "bg-indigo-500" },
-  { key: "proposal", label: "הצעה נשלחה", color: "bg-amber-500" },
-  { key: "won", label: "סגור", color: "bg-emerald-600" },
-  { key: "lost", label: "אבוד", color: "bg-rose-500" },
+const STAGES: { key: Stage; color: string }[] = [
+  { key: "new", color: "bg-slate-500" },
+  { key: "contacted", color: "bg-blue-500" },
+  { key: "qualified", color: "bg-indigo-500" },
+  { key: "proposal", color: "bg-amber-500" },
+  { key: "won", color: "bg-emerald-600" },
+  { key: "lost", color: "bg-rose-500" },
 ];
 
-const ACTIVITY_LABEL: Record<ActivityType, string> = {
-  call: "שיחה",
-  meeting: "פגישה",
-  email: "אימייל",
-  task: "משימה",
-  note: "הערה",
-};
-
-const CHANNEL_LABEL: Record<CommChannel, string> = {
-  phone: "טלפון",
-  email: "אימייל",
-  whatsapp: "וואטסאפ",
-  meeting: "פגישה",
-  other: "אחר",
-};
-
-const INVOICE_LABEL: Record<InvoiceStatus, string> = {
-  draft: "טיוטה",
-  sent: "נשלחה",
-  paid: "שולמה",
-  overdue: "באיחור",
-  cancelled: "בוטלה",
-};
+const ACTIVITY_TYPES: ActivityType[] = ["call", "meeting", "email", "task", "note"];
+const CHANNEL_TYPES: CommChannel[] = ["phone", "email", "whatsapp", "meeting", "other"];
+const INVOICE_STATUSES: InvoiceStatus[] = ["draft", "sent", "paid", "overdue", "cancelled"];
 
 type LeadRow = {
   id: string;
@@ -130,6 +111,11 @@ const emptyLead = {
 
 function CrmPage() {
   const { role } = useAuth();
+  const { t } = useI18n();
+  const ACTIVITY_LABEL: Record<ActivityType, string> = { call: t("act.call"), meeting: t("act.meeting"), email: t("act.email"), task: t("act.task"), note: t("act.note") };
+  const CHANNEL_LABEL: Record<CommChannel, string> = { phone: t("chan.phone"), email: t("chan.email"), whatsapp: t("chan.whatsapp"), meeting: t("chan.meeting"), other: t("chan.other") };
+  const INVOICE_LABEL: Record<InvoiceStatus, string> = { draft: t("inv.draft"), sent: t("inv.sent"), paid: t("inv.paid"), overdue: t("inv.overdue"), cancelled: t("inv.cancelled") };
+  const stageLabel = (k: Stage) => t(`stage.${k}`);
   const qc = useQueryClient();
   const fetchOverview = useServerFn(getCrmOverview);
   const fetchLeads = useServerFn(listLeads);
@@ -328,7 +314,7 @@ function CrmPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">{l.name}</span>
                     <Badge className={`${STAGES.find((s) => s.key === l.stage)?.color} text-white text-[10px]`}>
-                      {STAGES.find((s) => s.key === l.stage)?.label}
+                      {stageLabel(l.stage)}
                     </Badge>
                   </div>
                   <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
@@ -397,7 +383,7 @@ function CrmPage() {
                 <div className="mb-2 flex items-center justify-between px-1">
                   <div className="flex items-center gap-2">
                     <span className={`h-2 w-2 rounded-full ${s.color}`} />
-                    <span className="text-sm font-medium">{s.label}</span>
+                    <span className="text-sm font-medium">{stageLabel(s.key)}</span>
                     <span className="text-xs text-muted-foreground">({stageLeads.length})</span>
                   </div>
                 </div>
@@ -419,7 +405,7 @@ function CrmPage() {
                           <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {STAGES.map((s2) => (
-                              <SelectItem key={s2.key} value={s2.key} className="text-xs">{s2.label}</SelectItem>
+                              <SelectItem key={s2.key} value={s2.key} className="text-xs">{stageLabel(s2.key)}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -471,7 +457,7 @@ function CrmPage() {
                 <Select value={leadForm.stage} onValueChange={(v) => setLeadForm({ ...leadForm, stage: v as Stage })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {STAGES.map((s) => <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>)}
+                    {STAGES.map((s) => <SelectItem key={s.key} value={s.key}>{stageLabel(s.key)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -647,7 +633,7 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
                   <DialogDescription className="flex items-center gap-3 mt-1">
                     {lead.company && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{lead.company}</span>}
                     <Badge className={`${STAGES.find((s) => s.key === lead.stage)?.color} text-white`}>
-                      {STAGES.find((s) => s.key === lead.stage)?.label}
+                      {stageLabel(lead.stage)}
                     </Badge>
                     <span className="tabular-nums font-medium">{fmt(Number(lead.value), lead.currency)}</span>
                   </DialogDescription>
