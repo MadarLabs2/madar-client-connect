@@ -288,6 +288,9 @@ function AdminDashboard() {
           <h1 className="mt-1 font-display text-4xl tracking-tight">Client portfolio</h1>
         </div>
         <div className="flex gap-2">
+          <Button asChild variant="default" className="bg-primary">
+            <Link to="/crm">CRM</Link>
+          </Button>
           <Button variant="outline" onClick={openNewProject}>New project</Button>
           <Dialog open={clientOpen} onOpenChange={setClientOpen}>
             <DialogTrigger asChild>
