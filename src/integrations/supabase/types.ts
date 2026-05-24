@@ -256,6 +256,41 @@ export type Database = {
         }
         Relationships: []
       }
+      project_secrets: {
+        Row: {
+          created_at: string
+          project_id: string
+          supabase_anon_key: string | null
+          supabase_service_key: string | null
+          supabase_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          project_id: string
+          supabase_anon_key?: string | null
+          supabase_service_key?: string | null
+          supabase_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          project_id?: string
+          supabase_anon_key?: string | null
+          supabase_service_key?: string | null
+          supabase_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_secrets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           client_id: string
@@ -266,9 +301,6 @@ export type Database = {
           name: string
           progress: number
           status: Database["public"]["Enums"]["project_status"]
-          supabase_anon_key: string | null
-          supabase_service_key: string | null
-          supabase_url: string | null
           type: Database["public"]["Enums"]["project_type"]
           updated_at: string
         }
@@ -281,9 +313,6 @@ export type Database = {
           name: string
           progress?: number
           status?: Database["public"]["Enums"]["project_status"]
-          supabase_anon_key?: string | null
-          supabase_service_key?: string | null
-          supabase_url?: string | null
           type?: Database["public"]["Enums"]["project_type"]
           updated_at?: string
         }
@@ -296,9 +325,6 @@ export type Database = {
           name?: string
           progress?: number
           status?: Database["public"]["Enums"]["project_status"]
-          supabase_anon_key?: string | null
-          supabase_service_key?: string | null
-          supabase_url?: string | null
           type?: Database["public"]["Enums"]["project_type"]
           updated_at?: string
         }
