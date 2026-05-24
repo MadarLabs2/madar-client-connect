@@ -562,9 +562,6 @@ function AdminDashboard() {
                                 ניהול
                               </Link>
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setProductsProject(p)} aria-label="עריכת JSON של מוצרים">
-                              <Package className="h-3.5 w-3.5" />
-                            </Button>
                             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditProject(p)} aria-label="Edit">
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
