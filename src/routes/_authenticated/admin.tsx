@@ -47,7 +47,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { Pencil, Trash2, Database, Package } from "lucide-react";
+import { Pencil, Trash2, Database, Package, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminDashboard,
