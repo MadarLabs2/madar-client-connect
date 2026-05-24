@@ -383,7 +383,7 @@ function CrmPage() {
                 <div className="mb-2 flex items-center justify-between px-1">
                   <div className="flex items-center gap-2">
                     <span className={`h-2 w-2 rounded-full ${s.color}`} />
-                    <span className="text-sm font-medium">{s.label}</span>
+                    <span className="text-sm font-medium">{stageLabel(s.key)}</span>
                     <span className="text-xs text-muted-foreground">({stageLeads.length})</span>
                   </div>
                 </div>
@@ -405,7 +405,7 @@ function CrmPage() {
                           <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {STAGES.map((s2) => (
-                              <SelectItem key={s2.key} value={s2.key} className="text-xs">{s2.label}</SelectItem>
+                              <SelectItem key={s2.key} value={s2.key} className="text-xs">{stageLabel(s2.key)}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -457,7 +457,7 @@ function CrmPage() {
                 <Select value={leadForm.stage} onValueChange={(v) => setLeadForm({ ...leadForm, stage: v as Stage })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {STAGES.map((s) => <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>)}
+                    {STAGES.map((s) => <SelectItem key={s.key} value={s.key}>{stageLabel(s.key)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
