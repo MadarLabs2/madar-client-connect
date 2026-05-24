@@ -1,4 +1,4 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -47,7 +47,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { Pencil, Trash2, Database, Package } from "lucide-react";
+import { Pencil, Trash2, Database, Package, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminDashboard,
@@ -556,7 +556,13 @@ function AdminDashboard() {
                           </div>
                           <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                             <span className="tabular-nums">{p.progress}%</span>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setProductsProject(p)} aria-label="Manage products">
+                            <Button asChild size="sm" variant="default" className="h-8 gap-1.5">
+                              <Link to="/manage/$projectId" params={{ projectId: p.id }}>
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                ניהול
+                              </Link>
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setProductsProject(p)} aria-label="עריכת JSON של מוצרים">
                               <Package className="h-3.5 w-3.5" />
                             </Button>
                             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditProject(p)} aria-label="Edit">
