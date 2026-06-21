@@ -144,6 +144,7 @@ const dict: Dict = {
   "admin.projectUpdated": { he: "הפרויקט עודכן", en: "Project updated", ar: "تم تحديث المشروع" },
   "admin.projectCreated": { he: "הפרויקט נוצר", en: "Project created", ar: "تم إنشاء المشروع" },
   "admin.failedSaveProject": { he: "שמירת הפרויקט נכשלה", en: "Failed to save project", ar: "فشل حفظ المشروع" },
+  "admin.failedLoadProjects": { he: "טעינת הפרויקטים נכשלה", en: "Failed to load projects", ar: "فشل تحميل المشاريع" },
   "admin.projectDeleted": { he: "הפרויקט נמחק", en: "Project deleted", ar: "تم حذف المشروع" },
   "admin.editAria": { he: "עריכה", en: "Edit", ar: "تعديل" },
   "admin.deleteAria": { he: "מחיקה", en: "Delete", ar: "حذف" },

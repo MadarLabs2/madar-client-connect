@@ -176,6 +176,71 @@ export const deleteProject = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Admin project list — server-side so RLS / missing embed columns cannot hide rows. */
+export const listAdminProjects = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+    const { data, error } = await supabaseAdmin
+      .from("projects")
+      .select(
+        "id,client_id,name,type,manage_template,status,progress,live_url,cms_url,updated_at, project_secrets(supabase_url,supabase_anon_key,supabase_service_key)",
+      )
+      .order("updated_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((p) => {
+      const secrets = Array.isArray(p.project_secrets) ? p.project_secrets[0] : p.project_secrets;
+      return {
+        id: p.id,
+        client_id: p.client_id,
+        name: p.name,
+        type: p.type,
+        manage_template: p.manage_template ?? "ecommerce",
+        status: p.status,
+        progress: p.progress,
+        live_url: p.live_url,
+        cms_url: p.cms_url,
+        updated_at: p.updated_at,
+        supabase_url: secrets?.supabase_url ?? null,
+        supabase_anon_key: secrets?.supabase_anon_key ?? null,
+        supabase_service_key: secrets?.supabase_service_key ?? null,
+        resend_from_email: null as string | null,
+        resend_admin_email: null as string | null,
+        email_test_mode: false,
+        has_resend_api_key: false,
+      };
+    });
+  });
+
+export const getAdminProjectEmailSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ projectId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { data: row, error } = await supabaseAdmin
+      .from("project_secrets")
+      .select("resend_from_email, resend_admin_email, email_test_mode, resend_api_key")
+      .eq("project_id", data.projectId)
+      .maybeSingle();
+    if (error) {
+      if (/does not exist|column/i.test(error.message)) {
+        return {
+          resendFromEmail: "",
+          resendAdminEmail: "",
+          emailTestMode: false,
+          hasResendApiKey: false,
+        };
+      }
+      throw new Error(error.message);
+    }
+    return {
+      resendFromEmail: row?.resend_from_email?.trim() ?? "",
+      resendAdminEmail: row?.resend_admin_email?.trim() ?? "",
+      emailTestMode: row?.email_test_mode === true,
+      hasResendApiKey: Boolean(row?.resend_api_key?.trim()),
+    };
+  });
+
 // ============ Products ============
 const ProductDataSchema = z.record(z.string(), z.unknown());
 

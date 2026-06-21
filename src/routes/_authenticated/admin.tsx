@@ -14,6 +14,8 @@ import {
   deleteClient,
   upsertProduct,
   deleteProduct,
+  listAdminProjects,
+  getAdminProjectEmailSettings,
 } from "@/lib/admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -137,6 +139,8 @@ function AdminDashboard() {
   const removeProject = useServerFn(deleteProject);
   const saveProduct = useServerFn(upsertProduct);
   const removeProduct = useServerFn(deleteProduct);
+  const fetchProjects = useServerFn(listAdminProjects);
+  const fetchEmailSettings = useServerFn(getAdminProjectEmailSettings);
 
   const [clientOpen, setClientOpen] = useState(false);
   const [projOpen, setProjOpen] = useState(false);
@@ -166,35 +170,11 @@ function AdminDashboard() {
   const projectsQ = useQuery({
     queryKey: ["admin-projects"],
     queryFn: async (): Promise<ProjectRow[]> => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select(
-          "id,client_id,name,type,manage_template,status,progress,live_url,cms_url,updated_at, project_secrets(supabase_url,supabase_anon_key,supabase_service_key,resend_from_email,resend_admin_email,email_test_mode,resend_api_key_set)",
-        )
-        .order("updated_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []).map((p) => {
-        const secrets = Array.isArray(p.project_secrets) ? p.project_secrets[0] : p.project_secrets;
-        return {
-          id: p.id,
-          client_id: p.client_id,
-          name: p.name,
-          type: p.type,
-          manage_template: (p.manage_template as ManageTemplateId) || "ecommerce",
-          status: p.status,
-          progress: p.progress,
-          live_url: p.live_url,
-          cms_url: p.cms_url,
-          updated_at: p.updated_at,
-          supabase_url: secrets?.supabase_url ?? null,
-          supabase_anon_key: secrets?.supabase_anon_key ?? null,
-          supabase_service_key: secrets?.supabase_service_key ?? null,
-          resend_from_email: secrets?.resend_from_email ?? null,
-          resend_admin_email: secrets?.resend_admin_email ?? null,
-          email_test_mode: secrets?.email_test_mode === true,
-          has_resend_api_key: secrets?.resend_api_key_set === true,
-        } satisfies ProjectRow;
-      });
+      const rows = await fetchProjects();
+      return rows.map((p) => ({
+        ...p,
+        manage_template: (p.manage_template as ManageTemplateId) || "ecommerce",
+      }));
     },
   });
 
@@ -243,6 +223,21 @@ function AdminDashboard() {
       hasResendApiKey: p.has_resend_api_key,
     });
     setProjOpen(true);
+    void fetchEmailSettings({ data: { projectId: p.id } })
+      .then((email) => {
+        setPForm((prev) =>
+          prev.clientId === p.client_id && prev.name === p.name
+            ? {
+                ...prev,
+                resendFromEmail: email.resendFromEmail,
+                resendAdminEmail: email.resendAdminEmail,
+                emailTestMode: email.emailTestMode,
+                hasResendApiKey: email.hasResendApiKey,
+              }
+            : prev,
+        );
+      })
+      .catch(() => {});
   }
 
   function openEditClient(c: ClientRow) {
@@ -614,6 +609,12 @@ function AdminDashboard() {
 
       <section className="space-y-3">
         <h2 className="font-display text-2xl tracking-tight">{t("admin.allClients")}</h2>
+
+        {projectsQ.isError ? (
+          <Card className="border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+            {projectsQ.error instanceof Error ? projectsQ.error.message : t("admin.failedLoadProjects")}
+          </Card>
+        ) : null}
 
         {clientsQ.isLoading ? (
           <Card className="p-6 text-sm text-muted-foreground">{t("admin.loading")}</Card>
