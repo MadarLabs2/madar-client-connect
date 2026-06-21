@@ -285,9 +285,9 @@ export const bakeryAdminDict: Record<string, Entry> = {
     ar: "تم حفظ الحملة (لم يُرسل بريد بعد).",
   },
   emailCampaignResendHint: {
-    he: "הוסיפו RESEND_API_KEY ו-RESEND_FROM_EMAIL לסביבת השרת (ראו .env.example) ופרסמו מחדש.",
-    en: "Add RESEND_API_KEY and RESEND_FROM_EMAIL to the server environment (see .env.example), then redeploy.",
-    ar: "أضف RESEND_API_KEY و RESEND_FROM_EMAIL إلى بيئة الخادم (راجع .env.example) ثم أعد النشر.",
+    he: "הגדירו Resend API Key וכתובת שולח ב-Admin → עריכת פרויקט → Resend.",
+    en: "Set Resend API Key and From address in Admin → Edit project → Resend.",
+    ar: "عيّن Resend API Key وعنوان المرسل في Admin → تعديل المشروع → Resend.",
   },
   emailCampaignSentTitle: { he: "הקמפיין נשלח", en: "Campaign sent", ar: "تم إرسال الحملة" },
   emailCampaignSentDesc: {
@@ -331,9 +331,14 @@ export const bakeryAdminDict: Record<string, Entry> = {
     ar: "إرسال البريد في وضع الاختبار",
   },
   emailTestModeDesc: {
-    he: "ללא דומיין מאומת, ניתן לשלוח מיילים רק לכתובת חשבון Resend. לאימות דומיין ב-Resend עדכנו RESEND_FROM_EMAIL (למשל orders@alnourbakery.com).",
-    en: "Without a verified domain, emails can only be sent to the Resend account email. Verify a custom domain in Resend and update RESEND_FROM_EMAIL for production (e.g. orders@alnourbakery.com).",
-    ar: "بدون نطاق موثّق، يمكن الإرسال فقط إلى بريد حساب Resend. بعد التحقق من النطاق في Resend، حدّث RESEND_FROM_EMAIL (مثل orders@alnourbakery.com).",
+    he: "מצב בדיקה פעיל לפרויקט זה. המיילים נשלחים רק למייל האדמין שהוגדר ב-Admin. כבו \"מצב בדיקה\" אחרי אימות דומיין ב-Resend.",
+    en: "Test mode is on for this project. Emails go only to the admin address set in Admin. Turn off test mode after verifying your domain in Resend.",
+    ar: "وضع الاختبار مفعّل لهذا المشروع. يُرسل البريد فقط إلى بريد المسؤول في Admin. أوقف وضع الاختبار بعد التحقق من النطاق في Resend.",
+  },
+  emailTestModeDescWithRecipient: {
+    he: "מצב בדיקה פעיל — המיילים נשלחים ל-{{email}} בלבד (לא לכל המנויים).",
+    en: "Test mode is on — emails are sent only to {{email}} (not to all subscribers).",
+    ar: "وضع الاختبار مفعّل — يُرسل البريد فقط إلى {{email}} (وليس لجميع المشتركين).",
   },
   adminOffersTestRecipientOnly: {
     he: "נמען בדיקה בלבד (פיתוח)",

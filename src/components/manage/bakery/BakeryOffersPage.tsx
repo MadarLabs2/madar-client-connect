@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Calendar,
   ChevronDown,
@@ -33,6 +35,8 @@ import {
   saveSavedEmailTemplates,
   type SavedEmailTemplate,
 } from "@/lib/bakery/emailOfferTemplatesStorage";
+import { getBakeryEmailStatusFn, sendCampaignEmailFn } from "@/lib/bakery/sendCampaignEmail.functions";
+import { useAuth } from "@/lib/auth";
 
 type BakeryOffersPageProps = { projectId: string };
 
@@ -120,6 +124,9 @@ function savedToDef(s: SavedEmailTemplate): TemplateDef {
 export function BakeryOffersPage({ projectId }: BakeryOffersPageProps) {
   const db = useBakeryDb(projectId);
   const { t, dir } = useBakeryT();
+  const { user, session } = useAuth();
+  const sendCampaignFn = useServerFn(sendCampaignEmailFn);
+  const emailStatusFn = useServerFn(getBakeryEmailStatusFn);
   const [subscribers, setSubscribers] = useState<{ id: string; email: string }[]>([]);
   const [past, setPast] = useState<CampaignRow[]>([]);
   const [subject, setSubject] = useState("");
@@ -141,6 +148,11 @@ export function BakeryOffersPage({ projectId }: BakeryOffersPageProps) {
   const [addTemplateOpen, setAddTemplateOpen] = useState(false);
   const [previewImageSrc, setPreviewImageSrc] = useState<string | null>(null);
   const [customRows, setCustomRows] = useState<SavedEmailTemplate[]>([]);
+
+  const { data: emailStatus } = useQuery({
+    queryKey: ["bakery-email-status", projectId],
+    queryFn: () => emailStatusFn({ data: { projectId } }),
+  });
 
   const [ntTitle, setNtTitle] = useState("");
   const [ntTag, setNtTag] = useState("");
@@ -310,24 +322,54 @@ export function BakeryOffersPage({ projectId }: BakeryOffersPageProps) {
       toast.message(t("adminOffersScheduleComingToast"));
       return;
     }
+    if (!user?.id) return toast.error(t("mustSignIn"));
+    if (!session?.access_token) return toast.error(t("mustSignIn"));
     setSending(true);
     try {
       const pct = discountPercent.trim() ? Number(discountPercent) : null;
-      const payload = {
-        subject: subject.slice(0, SUBJECT_MAX),
-        message: body,
-        discount_code: discountCode.trim() || null,
-        discount_percent: pct != null && !Number.isNaN(pct) ? pct : null,
-        recipients_type: testRecipient.trim() ? "test" : "subscribers",
-        recipients_count: testRecipient.trim() ? 1 : subscribers.length,
-        status: "saved",
-        sent_at: null,
-      };
-      const { error } = await db.from("email_campaigns").insert(payload);
-      if (error) throw error;
-      toast.message(t("emailCampaignSavedTitle"), {
-        description: t("emailNotConfigured"),
+      const result = await sendCampaignFn({
+        data: {
+          projectId,
+          subject: subject.slice(0, SUBJECT_MAX),
+          message: body,
+          coupon_code: discountCode.trim() || null,
+          discount_percent: pct != null && !Number.isNaN(pct) ? pct : null,
+          test_recipient: testRecipient.trim() || undefined,
+        },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
+      if (!result.ok) {
+        const msg =
+          result.error === "forbidden"
+            ? t("adminOffersForbidden")
+            : result.error === "invalid_resend_from"
+              ? t("emailCampaignInvalidFromEnv")
+              : result.error ?? t("emailCampaignSendError");
+        toast.error(msg);
+        setSending(false);
+        return;
+      }
+      if (result.noMailProvider) {
+        toast.message(t("emailCampaignSavedTitle"), {
+          description: t("emailCampaignResendHint"),
+        });
+      } else if (result.subscriberCount === 0) {
+        toast.success(t("emailCampaignSentTitle"), {
+          description: t("emailCampaignNoSubscribersToEmail"),
+        });
+      } else if (result.failed > 0) {
+        const base = t("emailCampaignPartialDesc")
+          .replace("{{sent}}", String(result.sent))
+          .replace("{{failed}}", String(result.failed));
+        const detail = result.resendLastError ? ` — ${result.resendLastError}` : "";
+        toast.message(t("emailCampaignPartialTitle"), {
+          description: `${base}${detail}`,
+        });
+      } else {
+        toast.success(t("emailCampaignSentTitle"), {
+          description: t("emailCampaignSentDesc").replace("{{n}}", String(result.sent)),
+        });
+      }
       setSubject("");
       setBody("");
       setDiscountCode("");
@@ -456,17 +498,37 @@ export function BakeryOffersPage({ projectId }: BakeryOffersPageProps) {
           </Button>
         </header>
 
-        <div
-          role="alert"
-          className="admin-section-enter mb-6 flex gap-3 rounded-xl border border-amber-300/80 bg-amber-50 px-4 py-3 text-sm text-amber-950"
-          style={{ animationDelay: "120ms" }}
-        >
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden />
-          <div>
-            <p className="font-semibold">{t("emailTestModeTitle")}</p>
-            <p className="mt-1 text-amber-900/90">{t("emailTestModeDesc")}</p>
+        {emailStatus?.testMode ? (
+          <div
+            role="alert"
+            className="admin-section-enter mb-6 flex gap-3 rounded-xl border border-amber-300/80 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+            style={{ animationDelay: "120ms" }}
+          >
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden />
+            <div>
+              <p className="font-semibold">{t("emailTestModeTitle")}</p>
+              <p className="mt-1 text-amber-900/90">
+                {emailStatus.testRecipient
+                  ? t("emailTestModeDescWithRecipient").replace("{{email}}", emailStatus.testRecipient)
+                  : t("emailTestModeDesc")}
+              </p>
+            </div>
           </div>
-        </div>
+        ) : null}
+
+        {!emailStatus?.configured && emailStatus !== undefined ? (
+          <div
+            role="alert"
+            className="admin-section-enter mb-6 flex gap-3 rounded-xl border border-red-300/80 bg-red-50 px-4 py-3 text-sm text-red-950"
+            style={{ animationDelay: "120ms" }}
+          >
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" aria-hidden />
+            <div>
+              <p className="font-semibold">{t("emailNotConfigured")}</p>
+              <p className="mt-1">{t("emailCampaignResendHint")}</p>
+            </div>
+          </div>
+        ) : null}
 
         <section className="admin-section-enter mb-8" style={{ animationDelay: "200ms" }}>
           <div className="mb-3 flex items-center justify-between gap-2">

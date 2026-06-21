@@ -3,7 +3,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
-import { orderStatusTemplate, type OrderStatusEmailData } from "@/lib/bakery/emailTemplates";
+import { orderStatusTemplate, offerEmailTemplate, type OrderStatusEmailData } from "@/lib/bakery/emailTemplates";
 import type { ProjectEmailConfig } from "@/lib/project-email.server";
 
 export type EmailType =
@@ -11,7 +11,8 @@ export type EmailType =
   | "order_status_preparing"
   | "order_status_ready"
   | "order_status_delivered"
-  | "order_status_cancelled";
+  | "order_status_cancelled"
+  | "offer";
 
 export type EmailLogStatus = "pending" | "processing" | "sent" | "failed";
 
@@ -29,6 +30,10 @@ function isEmailTestMode(config: ProjectEmailConfig): boolean {
   return config.resendFromEmail.includes("@resend.dev");
 }
 
+export function isProjectEmailTestMode(config: ProjectEmailConfig): boolean {
+  return isEmailTestMode(config);
+}
+
 function getTestRecipientEmail(config: ProjectEmailConfig): string {
   return config.adminEmail.trim();
 }
@@ -36,11 +41,12 @@ function getTestRecipientEmail(config: ProjectEmailConfig): string {
 function resolveRecipient(
   config: ProjectEmailConfig,
   intendedEmail: string,
+  overrideTestEmail?: string,
 ): { to: string; testModeNote?: string } {
   if (!isEmailTestMode(config)) {
     return { to: intendedEmail.trim() };
   }
-  const testTo = getTestRecipientEmail(config);
+  const testTo = (overrideTestEmail?.trim() || getTestRecipientEmail(config)).trim();
   if (!testTo) return { to: intendedEmail.trim() };
   if (testTo.toLowerCase() === intendedEmail.trim().toLowerCase()) {
     return { to: testTo };
@@ -191,6 +197,78 @@ export async function sendOrderStatusEmail(
   });
 
   return { ...result, noEmail: false };
+}
+
+async function logCampaignEmail(
+  db: SupabaseClient,
+  opts: {
+    campaignId: string | null;
+    recipientEmail: string;
+    subject: string;
+    status: EmailLogStatus;
+    providerMessageId?: string | null;
+    errorMessage?: string | null;
+    sentAt?: string | null;
+  },
+): Promise<void> {
+  try {
+    await db.from("email_logs").insert({
+      campaign_id: opts.campaignId,
+      order_id: null,
+      recipient_email: opts.recipientEmail,
+      email_type: "offer",
+      subject: opts.subject,
+      status: opts.status,
+      provider_message_id: opts.providerMessageId ?? null,
+      error_message: opts.errorMessage ?? null,
+      attempt_count: 1,
+      sent_at: opts.sentAt ?? null,
+    });
+  } catch (e) {
+    console.warn("[bakery/emailService] Campaign log skipped:", e);
+  }
+}
+
+export async function sendOfferEmail(
+  db: SupabaseClient,
+  config: ProjectEmailConfig,
+  params: {
+    to: string;
+    subject: string;
+    message: string;
+    couponCode?: string | null;
+    discountPercent?: number | null;
+    campaignId?: string | null;
+    testRecipientOverride?: string;
+  },
+): Promise<SendEmailResult> {
+  const { to: intendedTo, testModeNote } = resolveRecipient(
+    config,
+    params.to,
+    params.testRecipientOverride,
+  );
+  const { subject, html } = offerEmailTemplate({
+    subject: params.subject,
+    message: params.message,
+    couponCode: params.couponCode,
+    discountPercent: params.discountPercent,
+    testModeNote,
+  });
+
+  const result = await sendHtmlEmail(config, intendedTo, subject, html);
+  const now = new Date().toISOString();
+
+  await logCampaignEmail(db, {
+    campaignId: params.campaignId ?? null,
+    recipientEmail: intendedTo,
+    subject,
+    status: result.ok ? "sent" : "failed",
+    providerMessageId: result.providerMessageId ?? null,
+    errorMessage: result.ok ? null : (result.error ?? null),
+    sentAt: result.ok ? now : null,
+  });
+
+  return result;
 }
 
 export function isProjectEmailConfigured(config: ProjectEmailConfig | null): boolean {
