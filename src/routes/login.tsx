@@ -14,14 +14,11 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { signIn, signUp, user, role, hydrated } = useAuth();
+  const { signIn, user, role, hydrated } = useAuth();
   const { t } = useI18n();
   const nav = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [company, setCompany] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -33,21 +30,13 @@ function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const res =
-      mode === "signin"
-        ? await signIn(email, password)
-        : await signUp({ email, password, name, company });
+    const res = await signIn(email, password);
     setBusy(false);
     if (!res.ok) {
       toast.error(res.error);
       return;
     }
-    if (mode === "signup") {
-      toast.success(t("login.created"));
-      await signIn(email, password);
-    } else {
-      toast.success(t("login.welcome"));
-    }
+    toast.success(t("login.welcome"));
   }
 
   return (
@@ -75,7 +64,9 @@ function LoginPage() {
         </div>
 
         <div className="flex items-center justify-between text-xs text-primary-foreground/50">
-          <span>© {new Date().getFullYear()} {t("app.name")}</span>
+          <span>
+            © {new Date().getFullYear()} {t("app.name")}
+          </span>
         </div>
 
         {/* Decorative gradient blobs */}
@@ -106,26 +97,10 @@ function LoginPage() {
             <span className="font-display text-3xl tracking-tight">{t("app.name")}</span>
           </div>
 
-          <h2 className="font-display text-4xl tracking-tight">
-            {mode === "signin" ? t("login.signin") : t("login.signup")}
-          </h2>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            {mode === "signin" ? t("login.access") : t("login.firstAdmin")}
-          </p>
+          <h2 className="font-display text-4xl tracking-tight">{t("login.signin")}</h2>
+          <p className="mt-1.5 text-sm text-muted-foreground">{t("login.access")}</p>
 
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
-            {mode === "signup" && (
-              <>
-                <div className="space-y-1.5">
-                  <Label htmlFor="name">{t("login.fullName")}</Label>
-                  <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="company">{t("login.company")}</Label>
-                  <Input id="company" required value={company} onChange={(e) => setCompany(e.target.value)} />
-                </div>
-              </>
-            )}
             <div className="space-y-1.5">
               <Label htmlFor="email">{t("login.email")}</Label>
               <Input
@@ -143,7 +118,7 @@ function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                autoComplete="current-password"
                 required
                 minLength={8}
                 value={password}
@@ -156,20 +131,9 @@ function LoginPage() {
               className="w-full bg-gradient-primary shadow-elegant transition-transform hover:scale-[1.01]"
               disabled={busy}
             >
-              {busy ? t("login.wait") : mode === "signin" ? t("login.signin") : t("login.signup")}
+              {busy ? t("login.wait") : t("login.signin")}
             </Button>
           </form>
-
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            {mode === "signin" ? t("login.noAccount") : t("login.haveAccount")}{" "}
-            <button
-              type="button"
-              onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              {mode === "signin" ? t("login.signup") : t("login.signin")}
-            </button>
-          </p>
         </div>
       </div>
     </div>
