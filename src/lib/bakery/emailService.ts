@@ -3,7 +3,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
-import { orderStatusTemplate, offerEmailTemplate, type OrderStatusEmailData } from "@/lib/bakery/emailTemplates";
+import { orderStatusTemplate, offerEmailTemplate, detectOfferLocale, resolveOfferImageUrl, type OrderStatusEmailData } from "@/lib/bakery/emailTemplates";
 import type { ProjectEmailConfig } from "@/lib/project-email.server";
 
 export type EmailType =
@@ -240,6 +240,8 @@ export async function sendOfferEmail(
     discountPercent?: number | null;
     campaignId?: string | null;
     testRecipientOverride?: string;
+    imageUrl?: string | null;
+    shopUrl?: string | null;
   },
 ): Promise<SendEmailResult> {
   const { to: intendedTo, testModeNote } = resolveRecipient(
@@ -247,12 +249,17 @@ export async function sendOfferEmail(
     params.to,
     params.testRecipientOverride,
   );
+  const locale = detectOfferLocale(params.subject, params.message);
+  const resolvedImage = resolveOfferImageUrl(params.imageUrl);
   const { subject, html } = offerEmailTemplate({
     subject: params.subject,
     message: params.message,
     couponCode: params.couponCode,
     discountPercent: params.discountPercent,
     testModeNote,
+    imageUrl: resolvedImage,
+    locale,
+    shopUrl: params.shopUrl,
   });
 
   const result = await sendHtmlEmail(config, intendedTo, subject, html);

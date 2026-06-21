@@ -6,6 +6,8 @@
 
 const BRAND = "Al-nour Gluten-free Bakery";
 const BRAND_SHORT = "Al-Nour Bakery";
+const BRAND_HE = "מאפיית אלנור ללא גלוטן";
+const BRAND_AR = "مخبز النور الخالي من الغلوتين";
 const TAGLINE = "Fresh · Wholesome · 100% Gluten-free";
 const GREEN = "#1B4332";
 const GREEN_LIGHT = "#2D6A4F";
@@ -60,7 +62,8 @@ function testModeBanner(note: string): string {
   </table>`;
 }
 
-function emailHeader(subtitle?: string): string {
+function emailHeader(subtitle?: string, locale?: EmailLocale): string {
+  const brand = locale === "he" ? BRAND_HE : locale === "ar" ? BRAND_AR : BRAND;
   const sub = subtitle ?? TAGLINE;
   return `<tr>
     <td style="padding:0;background:${GREEN};">
@@ -71,7 +74,7 @@ function emailHeader(subtitle?: string): string {
             <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 16px;">
               <tr><td style="width:56px;height:56px;background:${GOLD};border-radius:50%;text-align:center;vertical-align:middle;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:${GREEN};line-height:56px;">A</td></tr>
             </table>
-            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:${WHITE};letter-spacing:0.3px;line-height:1.25;">${BRAND}</p>
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:${WHITE};letter-spacing:0.3px;line-height:1.25;">${brand}</p>
             <p style="margin:10px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${GOLD_LIGHT};letter-spacing:2px;text-transform:uppercase;">${sub}</p>
             <!-- Gold divider -->
             <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:20px auto 0;">
@@ -136,7 +139,7 @@ function emailShell(
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CREAM};min-width:100%;">
     <tr><td align="center" style="padding:32px 16px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:${WHITE};border-radius:16px;overflow:hidden;border:1px solid ${BORDER};box-shadow:0 4px 24px rgba(27,67,50,0.08);">
-        ${emailHeader(headerSubtitle)}
+        ${emailHeader(headerSubtitle, locale)}
         <tr>
           <td style="padding:36px 32px 32px;font-family:Arial,Helvetica,sans-serif;color:${BROWN};">
             ${content}
@@ -367,13 +370,75 @@ function confirmationEmailLabels(locale: EmailLocale): ConfirmationLabels {
   };
 }
 
-function shopUrl(): string {
+function shopUrl(override?: string | null): string {
+  const fromOverride = override?.trim();
+  if (fromOverride) return fromOverride.replace(/\/$/, "");
   return (
     process.env.APP_BASE_URL?.trim() ||
     process.env.SITE_URL?.trim() ||
     process.env.VITE_SITE_URL?.trim() ||
-    "http://localhost:8080"
-  );
+    "https://madar-client-connect.vercel.app"
+  ).replace(/\/$/, "");
+}
+
+export function resolveOfferImageUrl(src: string | null | undefined): string | null {
+  const trimmed = src?.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("/")) {
+    const portalBase = (
+      process.env.APP_BASE_URL?.trim() ||
+      process.env.SITE_URL?.trim() ||
+      process.env.VITE_SITE_URL?.trim() ||
+      "https://madar-client-connect.vercel.app"
+    ).replace(/\/$/, "");
+    return `${portalBase}${trimmed}`;
+  }
+  return null;
+}
+
+export function detectOfferLocale(subject: string, message: string): EmailLocale {
+  const text = `${subject}\n${message}`;
+  if (/[\u0600-\u06FF]/.test(text)) return "ar";
+  if (/[\u0590-\u05FF]/.test(text)) return "he";
+  return "he";
+}
+
+function offerLabels(locale: EmailLocale) {
+  if (locale === "ar") {
+    return {
+      headerSubtitle: "عرض خاص",
+      badge: "عرض حصري",
+      specialOffer: "عرض خاص",
+      percentOff: "خصم على طلبك القادم",
+      yourCode: "الرمز",
+      checkoutHint: "استخدمه عند الدفع · لفترة محدودة",
+      cta: "← تسوق الآن",
+      tagline: "مخبوزات طازجة خالية من الغلuten — مخبوزة بحب.",
+    };
+  }
+  if (locale === "he") {
+    return {
+      headerSubtitle: "מבצע מיוחד",
+      badge: "הצעה בלעדית",
+      specialOffer: "מבצע מיוחד",
+      percentOff: "הנחה על ההזמנה הבאה",
+      yourCode: "הקוד שלך",
+      checkoutHint: "להחלה בקופה · לזמן מוגבל",
+      cta: "לחנות ←",
+      tagline: "לחמים, מאפים ועוגות ללא גלוטן — אפויים באהבה.",
+    };
+  }
+  return {
+    headerSubtitle: "Special Offer",
+    badge: "Exclusive Offer",
+    specialOffer: "Special Offer",
+    percentOff: "OFF your next order",
+    yourCode: "Your code",
+    checkoutHint: "Apply at checkout · Limited time",
+    cta: "Shop Now →",
+    tagline: "Fresh gluten-free breads, pastries & cakes — baked with love.",
+  };
 }
 
 function adminPanelUrl(): string {
@@ -527,22 +592,39 @@ export type OfferEmailData = {
   couponCode?: string | null;
   discountPercent?: number | null;
   testModeNote?: string;
+  imageUrl?: string | null;
+  locale?: EmailLocale;
+  shopUrl?: string | null;
 };
 
-function couponTicket(code: string | null | undefined, percent: number | null | undefined): string {
+function offerHeroImage(url: string): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;border-radius:12px;overflow:hidden;border:1px solid ${BORDER};">
+    <tr><td style="padding:0;line-height:0;">
+      <img src="${escapeHtml(url)}" alt="" width="536" style="display:block;width:100%;max-width:100%;height:auto;border:0;" />
+    </td></tr>
+  </table>`;
+}
+
+function couponTicket(
+  code: string | null | undefined,
+  percent: number | null | undefined,
+  locale: EmailLocale,
+): string {
   if (!code && !percent) return "";
+  const L = offerLabels(locale);
+  const rtl = locale !== "en";
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:32px 0;">
     <tr><td style="padding:0;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:14px;overflow:hidden;border:2px dashed ${GOLD};">
         <tr>
           <td style="padding:28px 24px;background:linear-gradient(145deg,#FFFBF5 0%,${CREAM} 50%,#FFF8E7 100%);text-align:center;">
-            <p style="margin:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${MUTED};letter-spacing:2px;text-transform:uppercase;font-weight:bold;">Special Offer</p>
-            ${percent ? `<p style="margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:42px;font-weight:bold;color:${GREEN};line-height:1;">${percent}<span style="font-size:22px;">%</span></p><p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BROWN};font-weight:600;">OFF your next order</p>` : ""}
+            <p style="margin:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${MUTED};letter-spacing:2px;text-transform:uppercase;font-weight:bold;">${L.specialOffer}</p>
+            ${percent ? `<p style="margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:42px;font-weight:bold;color:${GREEN};line-height:1;" dir="ltr">${percent}<span style="font-size:22px;">%</span></p><p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BROWN};font-weight:600;">${L.percentOff}</p>` : ""}
             ${code ? `<table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr><td style="padding:12px 28px;background:${WHITE};border:2px solid ${GOLD};border-radius:8px;">
-              <p style="margin:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:${MUTED};letter-spacing:1.5px;text-transform:uppercase;">Your code</p>
-              <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:24px;font-weight:bold;color:${GREEN};letter-spacing:4px;">${escapeHtml(code)}</p>
+              <p style="margin:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:${MUTED};letter-spacing:1.5px;text-transform:uppercase;">${L.yourCode}</p>
+              <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:24px;font-weight:bold;color:${GREEN};letter-spacing:4px;" dir="ltr">${escapeHtml(code)}</p>
             </td></tr></table>` : ""}
-            <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};">Apply at checkout · Limited time</p>
+            <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};">${L.checkoutHint}</p>
           </td>
         </tr>
       </table>
@@ -551,31 +633,40 @@ function couponTicket(code: string | null | undefined, percent: number | null | 
 }
 
 export function offerEmailTemplate(data: OfferEmailData): { subject: string; html: string } {
+  const locale = data.locale ?? detectOfferLocale(data.subject, data.message);
+  const L = offerLabels(locale);
+  const rtl = locale !== "en";
+  const align = rtl ? "right" : "left";
+  const messageBorder = rtl
+    ? `border-right:4px solid ${GOLD};`
+    : `border-left:4px solid ${GOLD};`;
   const testBanner = data.testModeNote ? testModeBanner(data.testModeNote) : "";
+  const hero = data.imageUrl ? offerHeroImage(data.imageUrl) : "";
+  const storeUrl = shopUrl(data.shopUrl);
 
   const content = `
     ${testBanner}
+    ${hero}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-      <tr><td style="text-align:center;padding-bottom:4px;">${statusBadge("Exclusive Offer")}</td></tr>
+      <tr><td style="text-align:center;padding-bottom:4px;">${statusBadge(L.badge)}</td></tr>
     </table>
     <h1 style="margin:12px 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:bold;color:${GREEN};text-align:center;line-height:1.3;">${escapeHtml(data.subject)}</h1>
 
-    <!-- Message body -->
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
-      <tr><td style="padding:24px 26px;background:${CREAM};border-radius:12px;border-left:4px solid ${GOLD};">
-        <div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;color:${BROWN};line-height:1.75;">${plainTextToHtml(data.message)}</div>
+      <tr><td style="padding:24px 26px;background:${CREAM};border-radius:12px;${messageBorder}">
+        <div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;color:${BROWN};line-height:1.75;text-align:${align};">${plainTextToHtml(data.message)}</div>
       </td></tr>
     </table>
 
-    ${couponTicket(data.couponCode, data.discountPercent ?? null)}
+    ${couponTicket(data.couponCode, data.discountPercent ?? null, locale)}
 
-    ${ctaButton("Shop Now →", shopUrl())}
+    ${ctaButton(L.cta, storeUrl)}
 
-    <p style="margin:24px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:${MUTED};text-align:center;line-height:1.6;">Fresh gluten-free breads, pastries &amp; cakes — baked with love.</p>`;
+    <p style="margin:24px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:${MUTED};text-align:center;line-height:1.6;">${L.tagline}</p>`;
 
   return {
     subject: data.subject,
-    html: emailShell(content, "Special Offer", data.subject),
+    html: emailShell(content, L.headerSubtitle, data.subject, { locale }),
   };
 }
 

@@ -48,6 +48,7 @@ const sendOfferInput = z.object({
   coupon_code: z.string().max(100).nullable(),
   discount_percent: z.number().min(0).max(100).nullable().optional(),
   test_recipient: z.string().email().optional(),
+  image_url: z.string().max(2000).optional().nullable(),
 });
 
 export type SendCampaignResult = {
@@ -68,8 +69,16 @@ export const sendCampaignEmailFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => sendOfferInput.parse(input))
   .handler(async ({ data, context }): Promise<SendCampaignResult> => {
-    const { projectId, subject, message, coupon_code, discount_percent, test_recipient } = data;
+    const { projectId, subject, message, coupon_code, discount_percent, test_recipient, image_url } =
+      data;
     const admin = await isPlatformAdmin(context.userId);
+
+    const { data: projectMeta } = await supabaseAdmin
+      .from("projects")
+      .select("live_url")
+      .eq("id", projectId)
+      .maybeSingle();
+    const shopUrl = projectMeta?.live_url?.trim() || null;
 
     let projectDb: Awaited<ReturnType<typeof getProjectClient>>;
     try {
@@ -184,6 +193,8 @@ export const sendCampaignEmailFn = createServerFn({ method: "POST" })
         discountPercent: discount_percent ?? null,
         campaignId,
         testRecipientOverride: test_recipient || emailConfig.adminEmail,
+        imageUrl: image_url ?? null,
+        shopUrl,
       });
 
       if (result.ok) sent += 1;

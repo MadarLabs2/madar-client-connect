@@ -335,6 +335,7 @@ export function BakeryOffersPage({ projectId }: BakeryOffersPageProps) {
           coupon_code: discountCode.trim() || null,
           discount_percent: pct != null && !Number.isNaN(pct) ? pct : null,
           test_recipient: testRecipient.trim() || undefined,
+          image_url: previewImageSrc,
         },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
