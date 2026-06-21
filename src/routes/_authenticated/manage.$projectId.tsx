@@ -1,8 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { z } from "zod";
+
+import {
+  getManageTemplate,
+  isManageTabAllowed,
+  type ManageTabId,
+} from "@/lib/project-templates";
 import {
   projectInfo,
   projectList,
@@ -21,6 +27,8 @@ import { ReportsManager } from "@/components/manage/ReportsManager";
 import { CouponsManager } from "@/components/manage/CouponsManager";
 import { NotificationsManager } from "@/components/manage/NotificationsManager";
 import { SettingsManager } from "@/components/manage/SettingsManager";
+import { BakeryManageApp } from "@/components/manage/bakery/BakeryManageApp";
+import { BakeryAdminLoadingScreen } from "@/components/manage/bakery/BakeryAdminLayout";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -47,9 +55,7 @@ import {
 } from "lucide-react";
 
 const searchSchema = z.object({
-  tab: z
-    .enum(["overview", "products", "categories", "orders", "customers", "coupons", "reports", "notifications", "settings"])
-    .default("overview"),
+  tab: z.string().default("overview"),
 });
 
 export const Route = createFileRoute("/_authenticated/manage/$projectId")({
@@ -57,17 +63,17 @@ export const Route = createFileRoute("/_authenticated/manage/$projectId")({
   component: ManageProject,
 });
 
-const TABS = [
-  { id: "overview", label: "סקירה", icon: BarChart3, table: null },
-  { id: "products", label: "מוצרים", icon: Package, table: "products" as const },
-  { id: "categories", label: "קטגוריות", icon: Tags, table: "categories" as const },
-  { id: "orders", label: "הזמנות", icon: ShoppingCart, table: "orders" as const },
-  { id: "customers", label: "לקוחות", icon: Users, table: "profiles" as const },
-  { id: "coupons", label: "קופונים", icon: Ticket, table: "coupons" as const },
-  { id: "reports", label: "דוחות", icon: BarChart3, table: null },
-  { id: "notifications", label: "הודעות", icon: Bell, table: "newsletter_subscribers" as const },
-  { id: "settings", label: "הגדרות", icon: Settings, table: "site_settings" as const },
-] as const;
+const ALL_TABS = [
+  { id: "overview" as const, label: "סקירה", icon: BarChart3, table: null },
+  { id: "products" as const, label: "מוצרים", icon: Package, table: "products" as const },
+  { id: "categories" as const, label: "קטגוריות", icon: Tags, table: "categories" as const },
+  { id: "orders" as const, label: "הזמנות", icon: ShoppingCart, table: "orders" as const },
+  { id: "customers" as const, label: "לקוחות", icon: Users, table: "profiles" as const },
+  { id: "coupons" as const, label: "קופונים", icon: Ticket, table: "coupons" as const },
+  { id: "reports" as const, label: "דוחות", icon: BarChart3, table: null },
+  { id: "notifications" as const, label: "הודעות", icon: Bell, table: "newsletter_subscribers" as const },
+  { id: "settings" as const, label: "הגדרות", icon: Settings, table: "site_settings" as const },
+];
 
 function ManageProject() {
   const { projectId } = Route.useParams();
@@ -80,7 +86,36 @@ function ManageProject() {
     queryFn: () => infoFn({ data: { projectId } }),
   });
 
-  const activeTab = TABS.find((t) => t.id === tab) ?? TABS[0];
+  const resolvedTab: ManageTabId = isManageTabAllowed(info?.manageTemplate, tab)
+    ? (tab as ManageTabId)
+    : "overview";
+
+  useEffect(() => {
+    if (!isLoading && tab !== resolvedTab) {
+      navigate({ to: ".", search: { tab: resolvedTab }, params: { projectId }, replace: true });
+    }
+  }, [isLoading, tab, resolvedTab, navigate, projectId]);
+
+  if (isLoading) {
+    return <BakeryAdminLoadingScreen />;
+  }
+
+  if (info?.manageTemplate === "bakery") {
+    return (
+      <BakeryManageApp
+        projectId={projectId}
+        projectName={info.name}
+        hasCredentials={info.hasCredentials}
+        liveUrl={info.liveUrl}
+        tab={resolvedTab}
+        onTabChange={(nextTab) => navigate({ to: ".", search: { tab: nextTab }, params: { projectId } })}
+      />
+    );
+  }
+
+  const template = getManageTemplate(info?.manageTemplate);
+  const visibleTabs = ALL_TABS.filter((t) => template.tabs.includes(t.id));
+  const activeTab = visibleTabs.find((t) => t.id === resolvedTab) ?? visibleTabs[0];
 
   return (
     <div className="-mx-4 -my-6 flex min-h-[calc(100vh-4rem)]">
@@ -96,9 +131,10 @@ function ManageProject() {
         </div>
         <div className="mb-4 px-2 text-[11px] text-muted-foreground">
           {info?.hasCredentials ? "מחובר" : "לא מחובר ל-DB"}
+          {info?.manageTemplate ? ` · ${template.label.he}` : ""}
         </div>
         <nav className="space-y-0.5">
-          {TABS.map((t) => {
+          {visibleTabs.map((t) => {
             const Icon = t.icon;
             const active = t.id === activeTab.id;
             return (

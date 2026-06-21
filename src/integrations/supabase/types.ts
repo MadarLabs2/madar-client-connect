@@ -298,6 +298,7 @@ export type Database = {
           created_at: string
           id: string
           live_url: string | null
+          manage_template: string
           name: string
           progress: number
           status: Database["public"]["Enums"]["project_status"]
@@ -310,6 +311,7 @@ export type Database = {
           created_at?: string
           id?: string
           live_url?: string | null
+          manage_template?: string
           name: string
           progress?: number
           status?: Database["public"]["Enums"]["project_status"]
@@ -322,6 +324,7 @@ export type Database = {
           created_at?: string
           id?: string
           live_url?: string | null
+          manage_template?: string
           name?: string
           progress?: number
           status?: Database["public"]["Enums"]["project_status"]

@@ -74,6 +74,7 @@ const ProjectSchema = z.object({
   clientId: z.string().uuid(),
   name: z.string().min(1).max(200),
   type: z.enum(["website", "ecommerce", "web_app", "branding", "marketing"]),
+  manageTemplate: z.enum(["ecommerce", "bakery"]).default("ecommerce"),
   status: z.enum(["planning", "in_progress", "review", "live", "paused"]),
   progress: z.number().int().min(0).max(100),
   liveUrl: z.string().url().max(500).optional().or(z.literal("")),
@@ -88,14 +89,30 @@ function projectPayload(d: z.infer<typeof ProjectSchema>) {
     client_id: d.clientId,
     name: d.name,
     type: d.type,
+    manage_template: d.manageTemplate,
     status: d.status,
     progress: d.progress,
     live_url: d.liveUrl || null,
     cms_url: d.cmsUrl || null,
+  };
+}
+
+function secretsPayload(projectId: string, d: z.infer<typeof ProjectSchema>) {
+  return {
+    project_id: projectId,
     supabase_url: d.supabaseUrl || null,
     supabase_anon_key: d.supabaseAnonKey || null,
     supabase_service_key: d.supabaseServiceKey || null,
   };
+}
+
+async function upsertProjectSecrets(projectId: string, d: z.infer<typeof ProjectSchema>) {
+  const hasSecrets = d.supabaseUrl || d.supabaseAnonKey || d.supabaseServiceKey;
+  if (!hasSecrets) return;
+  const { error } = await supabaseAdmin
+    .from("project_secrets")
+    .upsert(secretsPayload(projectId, d));
+  if (error) throw new Error(error.message);
 }
 
 export const createProject = createServerFn({ method: "POST" })
@@ -103,8 +120,13 @@ export const createProject = createServerFn({ method: "POST" })
   .inputValidator((input) => ProjectSchema.parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const { error } = await supabaseAdmin.from("projects").insert(projectPayload(data));
+    const { data: created, error } = await supabaseAdmin
+      .from("projects")
+      .insert(projectPayload(data))
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
+    await upsertProjectSecrets(created.id, data);
     return { ok: true };
   });
 
@@ -120,6 +142,7 @@ export const updateProject = createServerFn({ method: "POST" })
       .update(projectPayload(data))
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+    await upsertProjectSecrets(data.id, data);
     return { ok: true };
   });
 

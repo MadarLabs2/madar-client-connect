@@ -1,14 +1,12 @@
 import { createMiddleware } from '@tanstack/react-start';
 import { getRequest } from '@tanstack/react-start/server';
 import { createClient } from '@supabase/supabase-js';
+import { getExternalDbAnonKey, getExternalDbUrl } from './config';
 
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
-    const URL = process.env.EXTERNAL_DB_URL;
-    const KEY = process.env.EXTERNAL_DB_ANON_KEY;
-    if (!URL || !KEY) {
-      throw new Error('Missing EXTERNAL_DB_URL or EXTERNAL_DB_ANON_KEY');
-    }
+    const URL = getExternalDbUrl();
+    const KEY = getExternalDbAnonKey();
 
     const request = getRequest();
     const authHeader = request?.headers?.get('authorization');

@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
+import { MANAGE_TEMPLATE_IDS, MANAGE_TEMPLATES, type ManageTemplateId } from "@/lib/project-templates";
 import { toast } from "sonner";
 import { Pencil, Trash2, Database, Package, ExternalLink } from "lucide-react";
 
@@ -66,6 +67,7 @@ type ProjectRow = {
   client_id: string;
   name: string;
   type: ProjectType;
+  manage_template: ManageTemplateId;
   status: ProjectStatus;
   progress: number;
   live_url: string | null;
@@ -84,6 +86,7 @@ type ProjectForm = {
   clientId: string;
   name: string;
   type: ProjectType;
+  manageTemplate: ManageTemplateId;
   status: ProjectStatus;
   progress: number;
   liveUrl: string;
@@ -97,6 +100,7 @@ const emptyProjectForm: ProjectForm = {
   clientId: "",
   name: "",
   type: "website",
+  manageTemplate: "ecommerce",
   status: "planning",
   progress: 0,
   liveUrl: "",
@@ -149,10 +153,29 @@ function AdminDashboard() {
     queryFn: async (): Promise<ProjectRow[]> => {
       const { data, error } = await supabase
         .from("projects")
-        .select("id,client_id,name,type,status,progress,live_url,cms_url,supabase_url,supabase_anon_key,supabase_service_key,updated_at")
+        .select(
+          "id,client_id,name,type,manage_template,status,progress,live_url,cms_url,updated_at, project_secrets(supabase_url,supabase_anon_key,supabase_service_key)",
+        )
         .order("updated_at", { ascending: false });
       if (error) throw error;
-      return data as ProjectRow[];
+      return (data ?? []).map((p) => {
+        const secrets = Array.isArray(p.project_secrets) ? p.project_secrets[0] : p.project_secrets;
+        return {
+          id: p.id,
+          client_id: p.client_id,
+          name: p.name,
+          type: p.type,
+          manage_template: (p.manage_template as ManageTemplateId) || "ecommerce",
+          status: p.status,
+          progress: p.progress,
+          live_url: p.live_url,
+          cms_url: p.cms_url,
+          updated_at: p.updated_at,
+          supabase_url: secrets?.supabase_url ?? null,
+          supabase_anon_key: secrets?.supabase_anon_key ?? null,
+          supabase_service_key: secrets?.supabase_service_key ?? null,
+        } satisfies ProjectRow;
+      });
     },
   });
 
@@ -186,6 +209,7 @@ function AdminDashboard() {
       clientId: p.client_id,
       name: p.name,
       type: p.type,
+      manageTemplate: p.manage_template,
       status: p.status,
       progress: p.progress,
       liveUrl: p.live_url ?? "",
@@ -358,6 +382,25 @@ function AdminDashboard() {
             <div className="grid gap-1.5">
               <Label htmlFor="pn">{t("admin.projectName")}</Label>
               <Input id="pn" value={pForm.name} onChange={(e) => setPForm({ ...pForm, name: e.target.value })} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("admin.manageTemplate")}</Label>
+              <Select
+                value={pForm.manageTemplate}
+                onValueChange={(v) => setPForm({ ...pForm, manageTemplate: v as ManageTemplateId })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {MANAGE_TEMPLATE_IDS.map((id) => (
+                    <SelectItem key={id} value={id}>
+                      {MANAGE_TEMPLATES[id].label.he}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {MANAGE_TEMPLATES[pForm.manageTemplate].description.he}
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">

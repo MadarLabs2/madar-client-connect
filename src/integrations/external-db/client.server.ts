@@ -1,12 +1,15 @@
 // Server-side admin client for external Supabase - bypasses RLS.
 // Use only in server functions / server routes.
 import { createClient } from '@supabase/supabase-js';
+import { getExternalDbServiceRoleKey, getExternalDbUrl } from './config';
 
 function createAdminClient() {
-  const URL = process.env.EXTERNAL_DB_URL;
-  const KEY = process.env.EXTERNAL_DB_SERVICE_ROLE_KEY;
-  if (!URL || !KEY) {
-    throw new Error('Missing EXTERNAL_DB_URL or EXTERNAL_DB_SERVICE_ROLE_KEY');
+  const URL = getExternalDbUrl();
+  const KEY = getExternalDbServiceRoleKey();
+  if (!KEY) {
+    throw new Error(
+      'Missing EXTERNAL_DB_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_ROLE_KEY). Add it to .env — Supabase Dashboard → Settings → API → service_role.',
+    );
   }
   return createClient(URL, KEY, {
     auth: { storage: undefined, persistSession: false, autoRefreshToken: false },

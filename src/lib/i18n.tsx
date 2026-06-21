@@ -93,6 +93,7 @@ const dict: Dict = {
   "admin.chooseClient": { he: "בחר לקוח", en: "Choose a client", ar: "اختر عميلاً" },
   "admin.projectName": { he: "שם הפרויקט", en: "Project name", ar: "اسم المشروع" },
   "admin.type": { he: "סוג", en: "Type", ar: "النوع" },
+  "admin.manageTemplate": { he: "תבנית ניהול", en: "Manage template", ar: "قالب الإدارة" },
   "admin.status": { he: "סטטוס", en: "Status", ar: "الحالة" },
   "admin.progressPct": { he: "התקדמות (%)", en: "Progress (%)", ar: "التقدم (%)" },
   "admin.liveUrl": { he: "קישור חי", en: "Live URL", ar: "رابط مباشر" },
