@@ -82,6 +82,10 @@ const ProjectSchema = z.object({
   supabaseUrl: z.string().url().max(500).optional().or(z.literal("")),
   supabaseAnonKey: z.string().max(2000).optional().or(z.literal("")),
   supabaseServiceKey: z.string().max(2000).optional().or(z.literal("")),
+  resendApiKey: z.string().max(500).optional().or(z.literal("")),
+  resendFromEmail: z.string().max(500).optional().or(z.literal("")),
+  resendAdminEmail: z.string().email().max(255).optional().or(z.literal("")),
+  emailTestMode: z.boolean().optional().default(false),
 });
 
 function projectPayload(d: z.infer<typeof ProjectSchema>) {
@@ -97,21 +101,37 @@ function projectPayload(d: z.infer<typeof ProjectSchema>) {
   };
 }
 
-function secretsPayload(projectId: string, d: z.infer<typeof ProjectSchema>) {
-  return {
-    project_id: projectId,
-    supabase_url: d.supabaseUrl || null,
-    supabase_anon_key: d.supabaseAnonKey || null,
-    supabase_service_key: d.supabaseServiceKey || null,
-  };
-}
-
 async function upsertProjectSecrets(projectId: string, d: z.infer<typeof ProjectSchema>) {
-  const hasSecrets = d.supabaseUrl || d.supabaseAnonKey || d.supabaseServiceKey;
-  if (!hasSecrets) return;
-  const { error } = await supabaseAdmin
+  const { data: existing } = await supabaseAdmin
     .from("project_secrets")
-    .upsert(secretsPayload(projectId, d));
+    .select(
+      "supabase_url, supabase_anon_key, supabase_service_key, resend_api_key, resend_from_email, resend_admin_email, email_test_mode",
+    )
+    .eq("project_id", projectId)
+    .maybeSingle();
+
+  const hasAny =
+    d.supabaseUrl ||
+    d.supabaseAnonKey ||
+    d.supabaseServiceKey ||
+    d.resendApiKey ||
+    d.resendFromEmail ||
+    d.resendAdminEmail ||
+    existing;
+  if (!hasAny) return;
+
+  const payload = {
+    project_id: projectId,
+    supabase_url: d.supabaseUrl || existing?.supabase_url || null,
+    supabase_anon_key: d.supabaseAnonKey || existing?.supabase_anon_key || null,
+    supabase_service_key: d.supabaseServiceKey || existing?.supabase_service_key || null,
+    resend_api_key: d.resendApiKey?.trim() || existing?.resend_api_key || null,
+    resend_from_email: d.resendFromEmail?.trim() || existing?.resend_from_email || null,
+    resend_admin_email: d.resendAdminEmail?.trim() || existing?.resend_admin_email || null,
+    email_test_mode: d.emailTestMode ?? existing?.email_test_mode ?? false,
+  };
+
+  const { error } = await supabaseAdmin.from("project_secrets").upsert(payload);
   if (error) throw new Error(error.message);
 }
 

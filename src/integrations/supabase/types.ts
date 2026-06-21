@@ -259,7 +259,12 @@ export type Database = {
       project_secrets: {
         Row: {
           created_at: string
+          email_test_mode: boolean
           project_id: string
+          resend_admin_email: string | null
+          resend_api_key: string | null
+          resend_api_key_set: boolean
+          resend_from_email: string | null
           supabase_anon_key: string | null
           supabase_service_key: string | null
           supabase_url: string | null
@@ -267,7 +272,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          email_test_mode?: boolean
           project_id: string
+          resend_admin_email?: string | null
+          resend_api_key?: string | null
+          resend_from_email?: string | null
           supabase_anon_key?: string | null
           supabase_service_key?: string | null
           supabase_url?: string | null
@@ -275,7 +284,11 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email_test_mode?: boolean
           project_id?: string
+          resend_admin_email?: string | null
+          resend_api_key?: string | null
+          resend_from_email?: string | null
           supabase_anon_key?: string | null
           supabase_service_key?: string | null
           supabase_url?: string | null

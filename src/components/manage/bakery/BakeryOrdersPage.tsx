@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { isSameDay, subDays } from "date-fns";
 import {
   Calendar,
@@ -38,6 +39,8 @@ import { resolveImage } from "@/lib/bakery/utils";
 import { cn } from "@/lib/utils";
 import { isOrderVisibleInAdmin } from "@/lib/bakery/orderPayment";
 import { fulfillmentLabelFromOrder } from "@/lib/bakery/fulfillmentLabel";
+import { sendOrderStatusEmailFn } from "@/lib/bakery/sendOrderStatusEmail.functions";
+import { useAuth } from "@/lib/auth";
 
 type BakeryOrdersPageProps = { projectId: string };
 
@@ -310,6 +313,8 @@ function OrdersListCard({
 export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
   const db = useBakeryDb(projectId);
   const { t, lang } = useBakeryT();
+  const { session } = useAuth();
+  const sendStatusEmailFn = useServerFn(sendOrderStatusEmailFn);
 
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [selected, setSelected] = useState<OrderRow | null>(null);
@@ -342,6 +347,12 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
       toast.success(t("updated"));
       setSelected((s) => (s && s.id === id ? { ...s, order_status: status } : s));
       void load();
+      if (session?.access_token) {
+        void sendStatusEmailFn({
+          data: { projectId, orderId: id, newStatus: status },
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        }).catch(() => {});
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("genericError"));
     }

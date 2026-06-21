@@ -49,7 +49,8 @@ import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { MANAGE_TEMPLATE_IDS, MANAGE_TEMPLATES, type ManageTemplateId } from "@/lib/project-templates";
 import { toast } from "sonner";
-import { Pencil, Trash2, Database, Package, ExternalLink } from "lucide-react";
+import { Pencil, Trash2, Database, Package, ExternalLink, Mail } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminDashboard,
@@ -75,6 +76,10 @@ type ProjectRow = {
   supabase_url: string | null;
   supabase_anon_key: string | null;
   supabase_service_key: string | null;
+  resend_from_email: string | null;
+  resend_admin_email: string | null;
+  email_test_mode: boolean;
+  has_resend_api_key: boolean;
   updated_at: string;
 };
 type ProductRow = { id: string; project_id: string; data: Record<string, unknown>; created_at: string };
@@ -94,6 +99,11 @@ type ProjectForm = {
   supabaseUrl: string;
   supabaseAnonKey: string;
   supabaseServiceKey: string;
+  resendApiKey: string;
+  resendFromEmail: string;
+  resendAdminEmail: string;
+  emailTestMode: boolean;
+  hasResendApiKey: boolean;
 };
 
 const emptyProjectForm: ProjectForm = {
@@ -108,6 +118,11 @@ const emptyProjectForm: ProjectForm = {
   supabaseUrl: "",
   supabaseAnonKey: "",
   supabaseServiceKey: "",
+  resendApiKey: "",
+  resendFromEmail: "",
+  resendAdminEmail: "",
+  emailTestMode: false,
+  hasResendApiKey: false,
 };
 
 function AdminDashboard() {
@@ -154,7 +169,7 @@ function AdminDashboard() {
       const { data, error } = await supabase
         .from("projects")
         .select(
-          "id,client_id,name,type,manage_template,status,progress,live_url,cms_url,updated_at, project_secrets(supabase_url,supabase_anon_key,supabase_service_key)",
+          "id,client_id,name,type,manage_template,status,progress,live_url,cms_url,updated_at, project_secrets(supabase_url,supabase_anon_key,supabase_service_key,resend_from_email,resend_admin_email,email_test_mode,resend_api_key_set)",
         )
         .order("updated_at", { ascending: false });
       if (error) throw error;
@@ -174,6 +189,10 @@ function AdminDashboard() {
           supabase_url: secrets?.supabase_url ?? null,
           supabase_anon_key: secrets?.supabase_anon_key ?? null,
           supabase_service_key: secrets?.supabase_service_key ?? null,
+          resend_from_email: secrets?.resend_from_email ?? null,
+          resend_admin_email: secrets?.resend_admin_email ?? null,
+          email_test_mode: secrets?.email_test_mode === true,
+          has_resend_api_key: secrets?.resend_api_key_set === true,
         } satisfies ProjectRow;
       });
     },
@@ -217,6 +236,11 @@ function AdminDashboard() {
       supabaseUrl: p.supabase_url ?? "",
       supabaseAnonKey: p.supabase_anon_key ?? "",
       supabaseServiceKey: p.supabase_service_key ?? "",
+      resendApiKey: "",
+      resendFromEmail: p.resend_from_email ?? "",
+      resendAdminEmail: p.resend_admin_email ?? "",
+      emailTestMode: p.email_test_mode,
+      hasResendApiKey: p.has_resend_api_key,
     });
     setProjOpen(true);
   }
@@ -462,6 +486,50 @@ function AdminDashboard() {
                   onChange={(e) => setPForm({ ...pForm, supabaseServiceKey: e.target.value })} />
                 <p className="text-xs text-muted-foreground">{t("admin.serviceKeyHint")}</p>
               </div>
+            </div>
+
+            <div className="space-y-3 rounded-md border border-border bg-muted/30 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Mail className="h-4 w-4" /> {t("admin.resendConn")}
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="rk">{t("admin.resendApiKey")}</Label>
+                <Input
+                  id="rk"
+                  type="password"
+                  placeholder={editingId && pForm.hasResendApiKey ? "••••••••" : "re_..."}
+                  value={pForm.resendApiKey}
+                  onChange={(e) => setPForm({ ...pForm, resendApiKey: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">{t("admin.resendApiKeyHint")}</p>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="rf">{t("admin.resendFromEmail")}</Label>
+                <Input
+                  id="rf"
+                  placeholder="Bakery Name <orders@domain.com>"
+                  value={pForm.resendFromEmail}
+                  onChange={(e) => setPForm({ ...pForm, resendFromEmail: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">{t("admin.resendFromHint")}</p>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="ra">{t("admin.resendAdminEmail")}</Label>
+                <Input
+                  id="ra"
+                  type="email"
+                  placeholder="admin@client.com"
+                  value={pForm.resendAdminEmail}
+                  onChange={(e) => setPForm({ ...pForm, resendAdminEmail: e.target.value })}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={pForm.emailTestMode}
+                  onCheckedChange={(v) => setPForm({ ...pForm, emailTestMode: v === true })}
+                />
+                {t("admin.emailTestMode")}
+              </label>
             </div>
 
             <DialogFooter>
