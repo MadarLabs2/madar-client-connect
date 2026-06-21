@@ -220,6 +220,7 @@ export function BakeryDashboard({ projectId, activeTab, onTabChange }: BakeryDas
         recent: (recentRes.data ?? []) as OrderRow[],
       };
     },
+    placeholderData: (prev) => prev,
   });
 
   const q = search.trim().toLowerCase();

@@ -43,18 +43,24 @@ export function BakeryPendingOrdersProvider({
   const pullCount = useCallback(
     async (playOnIncrease: boolean) => {
       const n = await fetchActionableOrderCount();
-      if (initialisedRef.current && playOnIncrease && n > lastRef.current) {
+      const prev = lastRef.current;
+      const changed = initialisedRef.current && n !== prev;
+
+      if (initialisedRef.current && playOnIncrease && n > prev) {
         playNewOrderChime();
       }
       lastRef.current = n;
       initialisedRef.current = true;
       setCount(n);
+
+      if (changed) {
+        setOrdersRevision((r) => r + 1);
+      }
     },
     [fetchActionableOrderCount],
   );
 
   const onOrdersChange = useCallback(() => {
-    setOrdersRevision((r) => r + 1);
     void pullCount(true);
   }, [pullCount]);
 

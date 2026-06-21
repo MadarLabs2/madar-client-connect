@@ -3,8 +3,8 @@ import { createClient, type RealtimeChannel, type SupabaseClient } from "@supaba
 import { useServerFn } from "@tanstack/react-start";
 import { bakeryProjectRealtimeConfig } from "@/lib/project-db.functions";
 
-const POLL_VISIBLE_MS = 5_000;
-const POLL_HIDDEN_MS = 20_000;
+const POLL_VISIBLE_MS = 15_000;
+const POLL_HIDDEN_MS = 60_000;
 
 type Options = {
   projectId: string;
