@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { useBakeryDb } from "@/lib/bakery/db";
 import { useBakeryT } from "@/lib/bakery/i18n";
 import { formatOrderDateDisplay } from "@/lib/bakery/formatDate";
-import { useBakeryPendingOrderCount } from "@/lib/bakery/useBakeryPendingOrderCount";
+import { useBakeryPendingOrderCount, useBakeryPendingOrders } from "@/lib/bakery/useBakeryPendingOrderCount";
 import { adminOrderStatusLabel, adminOrderStatusPillClass } from "@/lib/bakery/adminLabels";
 
 type BakeryDashboardProps = {
@@ -191,10 +191,11 @@ export function BakeryDashboard({ projectId, activeTab, onTabChange }: BakeryDas
   const db = useBakeryDb(projectId);
   const { t, lang } = useBakeryT();
   const pendingOrders = useBakeryPendingOrderCount();
+  const { ordersRevision } = useBakeryPendingOrders();
   const [search, setSearch] = useState("");
 
   const { data } = useQuery({
-    queryKey: ["bakery", projectId, "dashboard-kpis"],
+    queryKey: ["bakery", projectId, "dashboard-kpis", ordersRevision],
     queryFn: async () => {
       const [ordersRes, productsRes, totalsRes, subsCount, recentRes] = await Promise.all([
         db.from("orders").select("id", { head: true, count: "exact" }),

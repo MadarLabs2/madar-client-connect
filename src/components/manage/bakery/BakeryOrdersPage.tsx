@@ -41,6 +41,7 @@ import { isOrderVisibleInAdmin } from "@/lib/bakery/orderPayment";
 import { fulfillmentLabelFromOrder } from "@/lib/bakery/fulfillmentLabel";
 import { sendOrderStatusEmailFn } from "@/lib/bakery/sendOrderStatusEmail.functions";
 import { useAuth } from "@/lib/auth";
+import { useBakeryPendingOrders } from "@/components/manage/bakery/BakeryPendingOrdersContext";
 
 type BakeryOrdersPageProps = { projectId: string };
 
@@ -314,6 +315,7 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
   const db = useBakeryDb(projectId);
   const { t, lang } = useBakeryT();
   const { session } = useAuth();
+  const { ordersRevision } = useBakeryPendingOrders();
   const sendStatusEmailFn = useServerFn(sendOrderStatusEmailFn);
 
   const [orders, setOrders] = useState<OrderRow[]>([]);
@@ -338,7 +340,7 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
 
   useEffect(() => {
     void load();
-  }, [projectId]);
+  }, [projectId, ordersRevision]);
 
   const setStatus = async (id: string, status: string) => {
     try {

@@ -6,3 +6,5 @@ import { useBakeryPendingOrders } from "@/components/manage/bakery/BakeryPending
 export function useBakeryPendingOrderCount(): number {
   return useBakeryPendingOrders().pendingCount;
 }
+
+export { useBakeryPendingOrders };

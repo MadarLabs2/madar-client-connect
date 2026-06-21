@@ -137,5 +137,6 @@ export function playCashRegisterSound(volume = 0.52): void {
 }
 
 export function playNewOrderChime(volume = 0.52): void {
+  unlockOrderNotificationAudio();
   playCashRegisterSound(volume);
 }
