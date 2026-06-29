@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import type { AllowedTable } from "@/lib/project-db.server";
 import {
@@ -97,84 +98,97 @@ export function useBakeryDb(projectId: string) {
   const deleteStorageFn = useServerFn(projectSafeDeleteStorageFiles);
   const bakeryOrdersFn = useServerFn(bakeryOrdersList);
 
-  return {
-    from<T = unknown>(table: AllowedTable) {
-      return {
-        select(columns = "*", options?: SelectOptions) {
-          return new BakerySelectQuery<T>(projectId, table, listFn, countFn, options).select(columns);
-        },
-        async insert(row: Record<string, unknown>) {
-          await insertFn({ data: { projectId, table, row } });
-          return { error: null };
-        },
-        update(row: Record<string, unknown>) {
-          return {
-            async eq(column: string, value: string | number) {
-              if (column !== "id") throw new Error("Only eq('id', value) is supported for update()");
-              await updateFn({ data: { projectId, table, id: value, row } });
-              return { error: null };
-            },
-          };
-        },
-        delete() {
-          return {
-            async eq(column: string, value: string | number) {
-              if (column !== "id") throw new Error("Only eq('id', value) is supported for delete()");
-              await deleteFn({ data: { projectId, table, id: value } });
-              return { error: null };
-            },
-          };
-        },
-      };
-    },
-    async bakeryOrders(options?: {
-      limit?: number;
-      orderColumn?: string;
-      orderAscending?: boolean;
-      eq?: Record<string, EqValue>;
-    }) {
-      const res = await bakeryOrdersFn({
-        data: {
-          projectId,
-          limit: options?.limit,
-          orderColumn: options?.orderColumn,
-          orderAscending: options?.orderAscending,
-          eq: options?.eq,
-        },
-      });
-      return { data: res.rows ?? [], error: res.error ? new Error(res.error) : null };
-    },
-    async uploadImage(file: File, options?: { bucket?: string; folder?: string }) {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const chunkSize = 0x8000;
-      let binary = "";
-      for (let i = 0; i < bytes.length; i += chunkSize) {
-        binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize)));
-      }
-      const res = await uploadFn({
-        data: {
-          projectId,
-          fileName: file.name,
-          contentType: file.type || "image/jpeg",
-          dataBase64: btoa(binary),
-          bucket: options?.bucket,
-          folder: options?.folder,
-        },
-      });
-      return { data: res, error: null };
-    },
-    async safeDeleteStorageFiles(
-      urls: string[],
-      opts?: { excludeProductId?: string; excludeCategoryId?: string },
-    ) {
-      await deleteStorageFn({
-        data: {
-          projectId,
-          urls,
-          excludeProductId: opts?.excludeProductId,
-          excludeCategoryId: opts?.excludeCategoryId,
-        },
-      });
-    },
-  };
+  return useMemo(
+    () => ({
+      from<T = unknown>(table: AllowedTable) {
+        return {
+          select(columns = "*", options?: SelectOptions) {
+            return new BakerySelectQuery<T>(projectId, table, listFn, countFn, options).select(columns);
+          },
+          async insert(row: Record<string, unknown>) {
+            await insertFn({ data: { projectId, table, row } });
+            return { error: null };
+          },
+          update(row: Record<string, unknown>) {
+            return {
+              async eq(column: string, value: string | number) {
+                if (column !== "id") throw new Error("Only eq('id', value) is supported for update()");
+                await updateFn({ data: { projectId, table, id: value, row } });
+                return { error: null };
+              },
+            };
+          },
+          delete() {
+            return {
+              async eq(column: string, value: string | number) {
+                if (column !== "id") throw new Error("Only eq('id', value) is supported for delete()");
+                await deleteFn({ data: { projectId, table, id: value } });
+                return { error: null };
+              },
+            };
+          },
+        };
+      },
+      async bakeryOrders(options?: {
+        limit?: number;
+        orderColumn?: string;
+        orderAscending?: boolean;
+        eq?: Record<string, EqValue>;
+      }) {
+        const res = await bakeryOrdersFn({
+          data: {
+            projectId,
+            limit: options?.limit,
+            orderColumn: options?.orderColumn,
+            orderAscending: options?.orderAscending,
+            eq: options?.eq,
+          },
+        });
+        return { data: res.rows ?? [], error: res.error ? new Error(res.error) : null };
+      },
+      async uploadImage(file: File, options?: { bucket?: string; folder?: string }) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const chunkSize = 0x8000;
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize)));
+        }
+        const res = await uploadFn({
+          data: {
+            projectId,
+            fileName: file.name,
+            contentType: file.type || "image/jpeg",
+            dataBase64: btoa(binary),
+            bucket: options?.bucket,
+            folder: options?.folder,
+          },
+        });
+        return { data: res, error: null };
+      },
+      async safeDeleteStorageFiles(
+        urls: string[],
+        opts?: { excludeProductId?: string; excludeCategoryId?: string },
+      ) {
+        await deleteStorageFn({
+          data: {
+            projectId,
+            urls,
+            excludeProductId: opts?.excludeProductId,
+            excludeCategoryId: opts?.excludeCategoryId,
+          },
+        });
+      },
+    }),
+    [
+      projectId,
+      listFn,
+      countFn,
+      insertFn,
+      updateFn,
+      deleteFn,
+      uploadFn,
+      deleteStorageFn,
+      bakeryOrdersFn,
+    ],
+  );
 }

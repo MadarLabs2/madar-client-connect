@@ -84,7 +84,7 @@ export function BakerySettingsPage({ projectId }: BakerySettingsPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [db, lang, projectId]);
+  }, [projectId, lang]);
 
   const sectionCategories = useMemo(
     () =>
