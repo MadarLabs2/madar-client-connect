@@ -10,5 +10,9 @@ import { nitro } from "nitro/vite";
 // Vercel: Nitro preset (cloudflare plugin disabled). Local dev unchanged.
 export default defineConfig({
   cloudflare: false,
-  plugins: [nitro()],
+  plugins: [
+    nitro({
+      preset: process.env.VERCEL ? "vercel" : "node-server",
+    }),
+  ],
 });

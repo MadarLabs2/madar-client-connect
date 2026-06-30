@@ -11,7 +11,7 @@ import { AuthProvider } from "@/lib/auth";
 import { I18nProvider, useI18n } from "@/lib/i18n";
 import { Toaster } from "@/components/ui/sonner";
 
-import appCss from "../styles.css?url";
+import "../styles.css";
 
 function NotFoundComponent() {
   const { t } = useI18n();
@@ -71,7 +71,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
     ],
     links: [
-      { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
