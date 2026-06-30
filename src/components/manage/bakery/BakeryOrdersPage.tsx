@@ -11,6 +11,7 @@ import {
   Package,
   ShoppingBag,
   Truck,
+  X,
   XCircle,
 } from "lucide-react";
 import { BAKERY_PICKUP_ADDRESS } from "@/lib/bakery/checkoutDelivery";
@@ -36,6 +37,16 @@ import type { Lang } from "@/lib/i18n";
 import { formatOrderDate, formatOrderDateDisplay } from "@/lib/bakery/formatDate";
 import { adminOrderStatusLabel, adminOrderStatusPillClass } from "@/lib/bakery/adminLabels";
 import { resolveImage } from "@/lib/bakery/utils";
+import {
+  buildScheduleDateOptions,
+  enabledDaysFromMap,
+  fetchFulfillmentDays,
+  mergeOpenScheduleDates,
+  rowsToWeekdayMap,
+  type ScheduleDateOption,
+} from "@/lib/bakery/fulfillmentDays";
+import { WEEKDAY_DICT_KEYS } from "@/lib/bakery/fulfillmentDays-i18n";
+import { fetchAdminRestDays } from "@/lib/bakery/restDays";
 import { cn } from "@/lib/utils";
 import { isOrderVisibleInAdmin } from "@/lib/bakery/orderPayment";
 import { fulfillmentLabelFromOrder } from "@/lib/bakery/fulfillmentLabel";
@@ -147,6 +158,62 @@ function tabCount(orders: OrderRow[], tab: TabId): number {
 
 function dayBucket(orders: OrderRow[], day: Date) {
   return orders.filter((o) => o.created_at && isSameDay(new Date(o.created_at), day));
+}
+
+function orderFulfillmentIso(order: OrderRow): string | null {
+  const fulfillment = String(order.selected_fulfillment_date ?? "").trim();
+  if (!fulfillment) return null;
+  return fulfillment.split("T")[0] ?? null;
+}
+
+function orderMatchesFulfillmentDate(order: OrderRow, dayIso: string): boolean {
+  return orderFulfillmentIso(order) === dayIso;
+}
+
+function orderLineItems(order: OrderRow): Record<string, unknown>[] {
+  const raw = Array.isArray(order.items)
+    ? order.items
+    : Array.isArray(order.order_items)
+      ? order.order_items
+      : [];
+  return raw as Record<string, unknown>[];
+}
+
+function lineItemProductId(item: Record<string, unknown>): string {
+  return String(item.product_id ?? "").trim();
+}
+
+function lineItemKey(item: Record<string, unknown>): string {
+  const id = lineItemProductId(item);
+  if (id) return id;
+  const name = String(item.product_name ?? "").trim();
+  return name ? `name:${name}` : "";
+}
+
+function lineItemName(item: Record<string, unknown>): string {
+  return String(item.product_name ?? "").trim() || lineItemProductId(item) || "—";
+}
+
+type OrderProductOption = { id: string; name: string; totalQty: number };
+
+function collectProductsFromOrders(orders: OrderRow[]): OrderProductOption[] {
+  const map = new Map<string, { name: string; qty: number }>();
+  for (const order of orders) {
+    for (const item of orderLineItems(order)) {
+      const key = lineItemKey(item);
+      if (!key) continue;
+      const name = lineItemName(item);
+      const prev = map.get(key);
+      map.set(key, { name: prev?.name ?? name, qty: (prev?.qty ?? 0) + Number(item.quantity ?? 0) });
+    }
+  }
+  return [...map.entries()]
+    .map(([id, { name, qty }]) => ({ id, name, totalQty: qty }))
+    .sort((a, b) => a.name.localeCompare(b.name, "he"));
+}
+
+function orderContainsProduct(order: OrderRow, productKey: string): boolean {
+  return orderLineItems(order).some((item) => lineItemKey(item) === productKey);
 }
 
 function trendLine(current: number, previous: number, t: Translate): string {
@@ -319,24 +386,48 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
   const sendStatusEmailFn = useServerFn(sendOrderStatusEmailFn);
 
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [scheduleDates, setScheduleDates] = useState<ScheduleDateOption[]>([]);
   const [selected, setSelected] = useState<OrderRow | null>(null);
   const [tab, setTab] = useState<TabId>("all");
+  const [dayFilter, setDayFilter] = useState<string | null>(null);
+  const [productFilterId, setProductFilterId] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
 
+  const weekdayLabel = (dayOfWeek: number) => t(WEEKDAY_DICT_KEYS[dayOfWeek] ?? "weekdaySunday");
+
   const load = () =>
-    db
-      .bakeryOrders({
+    Promise.all([
+      db.bakeryOrders({
         orderColumn: "created_at",
         orderAscending: false,
         limit: 400,
-      })
-      .then(({ data, error }) => {
-        if (error) {
-          toast.error(error.message);
-          return;
-        }
-        setOrders(normalizeOrders((data ?? []) as OrderRow[]));
-      });
+      }),
+      fetchFulfillmentDays(db),
+      fetchAdminRestDays(db),
+    ]).then(([ordersRes, daysRes, restRes]) => {
+      if (ordersRes.error) {
+        toast.error(ordersRes.error.message);
+        return;
+      }
+      setOrders(normalizeOrders((ordersRes.data ?? []) as OrderRow[]));
+
+      if (daysRes.ok) {
+        const restDays = restRes.ok ? restRes.rows : [];
+        const pickupDates = buildScheduleDateOptions(
+          enabledDaysFromMap(rowsToWeekdayMap(daysRes.rows, "pickup")),
+          weekdayLabel,
+          restDays,
+        );
+        const deliveryDates = buildScheduleDateOptions(
+          enabledDaysFromMap(rowsToWeekdayMap(daysRes.rows, "delivery")),
+          weekdayLabel,
+          restDays,
+        );
+        setScheduleDates(mergeOpenScheduleDates(pickupDates, deliveryDates));
+      } else {
+        setScheduleDates([]);
+      }
+    });
 
   useEffect(() => {
     void load();
@@ -391,10 +482,41 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
     };
   }, [orders, t]);
 
+  const ordersForTabs = useMemo(() => {
+    if (!dayFilter) return orders;
+    return orders.filter((o) => orderMatchesFulfillmentDate(o, dayFilter));
+  }, [orders, dayFilter]);
+
   const filtered = useMemo(
-    () => orders.filter((o) => orderMatchesTab(String(o.order_status), tab)),
-    [orders, tab],
+    () => ordersForTabs.filter((o) => orderMatchesTab(String(o.order_status), tab)),
+    [ordersForTabs, tab],
   );
+
+  const productsInOrders = useMemo(
+    () => (dayFilter ? collectProductsFromOrders(ordersForTabs) : []),
+    [dayFilter, ordersForTabs],
+  );
+
+  useEffect(() => {
+    if (productFilterId && !productsInOrders.some((p) => p.id === productFilterId)) {
+      setProductFilterId(null);
+    }
+  }, [productFilterId, productsInOrders]);
+
+  const dayFilterSummary = useMemo(() => {
+    if (!dayFilter) return null;
+    const sales = ordersForTabs.reduce((acc, o) => acc + Number(o.total_amount ?? 0), 0);
+    const label = scheduleDates.find((d) => d.isoDate === dayFilter)?.label ?? dayFilter;
+    return { count: ordersForTabs.length, sales, label };
+  }, [ordersForTabs, dayFilter, scheduleDates]);
+
+  const productFilterSummary = useMemo(() => {
+    if (!dayFilter || !productFilterId) return null;
+    const product = productsInOrders.find((p) => p.id === productFilterId);
+    if (!product) return null;
+    const orderCount = ordersForTabs.filter((o) => orderContainsProduct(o, productFilterId)).length;
+    return { name: product.name, qty: product.totalQty, orderCount };
+  }, [dayFilter, productFilterId, productsInOrders, ordersForTabs]);
 
   const statsCard = (
     <div
@@ -442,7 +564,7 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
     <div className="admin-section-enter flex items-center gap-2" style={{ animationDelay: "200ms" }}>
       <div className="scrollbar-none flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((def) => {
-          const count = tabCount(orders, def.id);
+          const count = tabCount(ordersForTabs, def.id);
           const active = tab === def.id;
           return (
             <button
@@ -482,6 +604,118 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
       >
         <Filter className="h-4 w-4" aria-hidden />
       </Button>
+    </div>
+  );
+
+  const filterBar = (
+    <div
+      className="admin-section-enter space-y-3 rounded-2xl border border-stone-200/90 bg-[#faf8f4]/80 p-4"
+      style={{ animationDelay: "160ms" }}
+    >
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+        <div className="min-w-[12rem] flex-1 space-y-1.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("adminOrdersFilterDay")}
+          </p>
+          <div className="flex gap-2">
+            <Select
+              value={dayFilter ?? "__all__"}
+              onValueChange={(v) => {
+                const next = v === "__all__" ? null : v;
+                setDayFilter(next);
+                if (!next) setProductFilterId(null);
+              }}
+            >
+              <SelectTrigger className="h-10 flex-1 border-stone-200 bg-white">
+                <SelectValue placeholder={t("adminOrdersFilterDayPlaceholder")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">{t("adminOrdersFilterDayAll")}</SelectItem>
+                {scheduleDates.map((d) => (
+                  <SelectItem key={d.isoDate} value={d.isoDate}>
+                    {d.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {dayFilter ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 shrink-0 border-stone-200 bg-white"
+                aria-label={t("adminOrdersFilterDayClear")}
+                onClick={() => {
+                  setDayFilter(null);
+                  setProductFilterId(null);
+                }}
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </Button>
+            ) : null}
+          </div>
+          {scheduleDates.length === 0 ? (
+            <p className="text-xs text-amber-800">{t("adminOrdersFilterNoScheduleDates")}</p>
+          ) : null}
+        </div>
+
+        <div className="min-w-[12rem] flex-1 space-y-1.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("adminOrdersFilterProduct")}
+          </p>
+          <Select
+            value={productFilterId ?? "__none__"}
+            onValueChange={(v) => setProductFilterId(v === "__none__" ? null : v)}
+            disabled={!dayFilter || productsInOrders.length === 0}
+          >
+            <SelectTrigger className="h-10 border-stone-200 bg-white">
+              <SelectValue
+                placeholder={
+                  !dayFilter
+                    ? t("adminOrdersFilterProductPickDate")
+                    : productsInOrders.length === 0
+                      ? t("adminOrdersFilterNoProductsInOrders")
+                      : t("adminOrdersFilterProductPlaceholder")
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">{t("adminOrdersFilterProductPlaceholder")}</SelectItem>
+              {productsInOrders.map((product) => (
+                <SelectItem key={product.id} value={product.id}>
+                  {t("adminOrdersFilterProductOption")
+                    .replace("{{name}}", product.name)
+                    .replace("{{count}}", String(product.totalQty))}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {dayFilter && productsInOrders.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{t("adminOrdersFilterNoProductsInOrders")}</p>
+          ) : null}
+        </div>
+      </div>
+
+      {dayFilterSummary || productFilterSummary ? (
+        <div className="flex flex-wrap gap-2">
+          {dayFilterSummary ? (
+            <span className="inline-flex items-center rounded-full bg-[#1B4332]/10 px-3 py-1 text-sm font-semibold text-[#1B4332]">
+              {dayFilterSummary.label}:{" "}
+              {t("adminOrdersFilterDaySummary")
+                .replace("{{count}}", String(dayFilterSummary.count))
+                .replace("{{sales}}", dayFilterSummary.sales.toFixed(2))}
+            </span>
+          ) : null}
+          {productFilterSummary ? (
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-950 ring-1 ring-amber-200/80">
+              {t("adminOrdersFilterProductSummary")
+                .replace("{{name}}", productFilterSummary.name)
+                .replace("{{count}}", String(productFilterSummary.qty))
+                .replace("{{orders}}", String(productFilterSummary.orderCount))}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 
@@ -533,6 +767,7 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
       ) : (
         <>
           {statsCard}
+          {filterBar}
           {tabStrip}
 
           {filtered.length === 0 ? (

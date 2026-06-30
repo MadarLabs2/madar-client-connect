@@ -151,6 +151,58 @@ export const bakeryAdminDict: Record<string, Entry> = {
     en: "No orders in this filter.",
     ar: "لا توجد طلبات في هذا التصفية.",
   },
+  adminOrdersFilterDay: {
+    he: "תאריך איסוף/משלוח",
+    en: "Pickup/delivery date",
+    ar: "تاريخ الاستلام/التوصيل",
+  },
+  adminOrdersFilterDayPlaceholder: {
+    he: "בחרו תאריך מזמינות",
+    en: "Choose from availability",
+    ar: "اختر من التوفر",
+  },
+  adminOrdersFilterDayAll: { he: "כל התאריכים", en: "All dates", ar: "كل التواريخ" },
+  adminOrdersFilterDayClear: { he: "נקה תאריך", en: "Clear date", ar: "مسح التاريخ" },
+  adminOrdersFilterNoScheduleDates: {
+    he: "אין תאריכים פתוחים — הגדירו זמינות בדף «זמינות הזמנות».",
+    en: "No open dates — configure availability in Order availability.",
+    ar: "لا توجد تواريخ مفتوحة — عيّن التوفر في صفحة توفر الطلبات.",
+  },
+  adminOrdersFilterProduct: {
+    he: "מוצר לסיכום הכנה",
+    en: "Product prep total",
+    ar: "إجمالي تحضير المنتج",
+  },
+  adminOrdersFilterProductPlaceholder: {
+    he: "בחרו מוצר",
+    en: "Choose product",
+    ar: "اختر منتجاً",
+  },
+  adminOrdersFilterProductPickDate: {
+    he: "בחרו תאריך קודם",
+    en: "Select a date first",
+    ar: "اختر تاريخاً أولاً",
+  },
+  adminOrdersFilterNoProductsInOrders: {
+    he: "אין מוצרים בהזמנות לתאריך זה",
+    en: "No products in orders for this date",
+    ar: "لا توجد منتجات في طلبات هذا التاريخ",
+  },
+  adminOrdersFilterProductOption: {
+    he: "{{name}} ({{count}} יחידות)",
+    en: "{{name}} ({{count}} units)",
+    ar: "{{name}} ({{count}} وحدة)",
+  },
+  adminOrdersFilterDaySummary: {
+    he: "{{count}} הזמנות · ₪{{sales}}",
+    en: "{{count}} orders · ₪{{sales}}",
+    ar: "{{count}} طلبات · ₪{{sales}}",
+  },
+  adminOrdersFilterProductSummary: {
+    he: "{{name}}: {{count}} יחידות להכנה ({{orders}} הזמנות)",
+    en: "{{name}}: {{count}} units to prepare ({{orders}} orders)",
+    ar: "{{name}}: {{count}} وحدة للتحضير ({{orders}} طلبات)",
+  },
 
   adminThOrderShort: { he: "הזמנה", en: "Order", ar: "الطلب" },
   adminThDate: { he: "תאריך", en: "Date", ar: "التاريخ" },

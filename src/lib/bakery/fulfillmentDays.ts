@@ -96,6 +96,18 @@ export function buildScheduleDateOptions(
   return options;
 }
 
+/** Union of open schedule dates from pickup/delivery (deduped, sorted). */
+export function mergeOpenScheduleDates(...lists: ScheduleDateOption[]): ScheduleDateOption[] {
+  const byIso = new Map<string, ScheduleDateOption>();
+  for (const list of lists) {
+    for (const option of list) {
+      if (!option.isOpen) continue;
+      if (!byIso.has(option.isoDate)) byIso.set(option.isoDate, option);
+    }
+  }
+  return [...byIso.values()].sort((a, b) => a.isoDate.localeCompare(b.isoDate));
+}
+
 export function hasAtLeastOneEnabled(map: WeekdayAvailability): boolean {
   return enabledDaysFromMap(map).length > 0;
 }
