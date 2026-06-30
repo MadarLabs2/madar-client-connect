@@ -65,7 +65,6 @@ export const MANAGE_TEMPLATES: Record<ManageTemplateId, ManageTemplate> = {
       "reports",
       "settings",
       "availability",
-      "rest-days",
     ],
     productsManager: "bakery",
   },

@@ -150,3 +150,37 @@ export async function updateRestDayStatus(
     return { ok: false, message: error instanceof Error ? error.message : String(error) };
   }
 }
+
+function findRestDayCovering(rows: RestDayRow[], isoDate: string): RestDayRow | undefined {
+  return rows.find(
+    (row) =>
+      row.is_active && isoDate >= row.start_date && isoDate <= restDayEndDate(row),
+  );
+}
+
+export async function toggleDateClosure(
+  db: BakeryDb,
+  isoDate: string,
+): Promise<{ ok: true; isNowClosed: boolean } | { ok: false; message: string }> {
+  const existing = await fetchAdminRestDays(db);
+  if (!existing.ok) return existing;
+
+  const covering = findRestDayCovering(existing.rows, isoDate);
+  if (covering) {
+    const end = restDayEndDate(covering);
+    if (covering.start_date !== isoDate || end !== isoDate) {
+      return { ok: false, message: "RANGE_REST_DAY" };
+    }
+    const removed = await deleteRestDay(db, covering.id);
+    if (!removed.ok) return removed;
+    return { ok: true, isNowClosed: false };
+  }
+
+  const created = await createRestDay(db, {
+    startDate: isoDate,
+    endDate: isoDate,
+    reason: null,
+  });
+  if (!created.ok) return created;
+  return { ok: true, isNowClosed: true };
+}

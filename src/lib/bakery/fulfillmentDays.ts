@@ -43,6 +43,59 @@ export function enabledDaysFromMap(map: WeekdayAvailability): number[] {
     .map(([dow]) => Number.parseInt(dow, 10));
 }
 
+export type ScheduleDateOption = {
+  isoDate: string;
+  label: string;
+  isOpen: boolean;
+};
+
+type RestDayForSchedule = {
+  start_date: string;
+  end_date: string | null;
+  is_active: boolean;
+};
+
+function scheduleRestDayEnd(row: RestDayForSchedule): string {
+  return row.end_date ?? row.start_date;
+}
+
+function isDateClosedByRestDays(isoDate: string, restDays: RestDayForSchedule[]): boolean {
+  return restDays.some(
+    (row) =>
+      row.is_active && isoDate >= row.start_date && isoDate <= scheduleRestDayEnd(row),
+  );
+}
+
+export function buildScheduleDateOptions(
+  enabledWeekdays: number[],
+  weekdayLabel: (dayOfWeek: number) => string,
+  restDays: RestDayForSchedule[],
+  horizonDays = 14,
+): ScheduleDateOption[] {
+  const enabled = new Set(enabledWeekdays);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const options: ScheduleDateOption[] = [];
+
+  for (let offset = 0; offset < horizonDays; offset++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + offset);
+    const dayOfWeek = date.getDay();
+    if (!enabled.has(dayOfWeek)) continue;
+
+    const isoDate = toIsoDate(date);
+    const weekday = weekdayLabel(dayOfWeek);
+    const label = `${weekday}, ${formatShortDate(date)}`;
+    options.push({
+      isoDate,
+      label,
+      isOpen: !isDateClosedByRestDays(isoDate, restDays),
+    });
+  }
+
+  return options;
+}
+
 export function hasAtLeastOneEnabled(map: WeekdayAvailability): boolean {
   return enabledDaysFromMap(map).length > 0;
 }

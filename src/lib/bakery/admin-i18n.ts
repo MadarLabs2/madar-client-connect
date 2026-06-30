@@ -105,9 +105,9 @@ export const bakeryAdminDict: Record<string, Entry> = {
     ar: "رسوم التوصيل وخيارات الدفع",
   },
   adminDashAvailabilityDesc: {
-    he: "הגדרת ימי איסוף ומשלוח לקביעת תאריך הזמנה.",
-    en: "Configure pickup and delivery weekdays for customer scheduling.",
-    ar: "تكوين أيام الاستلام والتوصيل لجدولة الطلبات.",
+    he: "הגדרת ימי שבוע קבועים וסגירת תאריכים ספציפיים לשבועיים הקרובים.",
+    en: "Configure recurring weekdays and close specific dates for the next two weeks.",
+    ar: "تكوين أيام الأسبوع المتكررة وإغلاق تواريخ محددة للأسبوعين القادمين.",
   },
   adminDashRestDaysDesc: {
     he: "סימון תאריכים שבהם המאפייה סגורה — לקוחות לא יוכלו להזמין בימים אלה.",
@@ -772,9 +772,46 @@ export const bakeryAdminDict: Record<string, Entry> = {
     ar: "توفر الاستلام والتوصيل",
   },
   adminOrderAvailabilitySubtitle: {
-    he: "הגדרת ימי שבוע זמינים לקביעת הזמנות.",
-    en: "Configure available weekdays for customer scheduling.",
-    ar: "تكوين أيام الأسبوع المتاحة لجدولة الطلبات.",
+    he: "הגדרת ימי שבוע קבועים וסגירת תאריכים ספציפיים לשבועיים הקרובים.",
+    en: "Configure recurring weekdays and close specific dates for the next two weeks.",
+    ar: "تكوين أيام الأسبوع المتكررة وإغلاق تواريخ محددة للأسبوعين القادمين.",
+  },
+  adminRecurringDaysTitle: {
+    he: "ימי שבוע קבועים",
+    en: "Recurring weekdays",
+    ar: "أيام الأسبوع المتكررة",
+  },
+  adminRecurringDaysDescription: {
+    he: "בחרו באילו ימי שבוע לקוחות יכולים לקבוע איסוף או משלוח.",
+    en: "Choose which weekdays customers can schedule pickup or delivery.",
+    ar: "اختر أيام الأسبوع التي يمكن للعملاء جدولة الاستلام أو التوصيل فيها.",
+  },
+  adminUpcomingDatesTitle: {
+    he: "תאריכים קרובים",
+    en: "Upcoming dates",
+    ar: "التواريخ القريبة",
+  },
+  adminUpcomingDatesDescription: {
+    he: "לחצו על תאריך כדי לסגור או לפתוח אותו לשבועיים הקרובים.",
+    en: "Tap a date to close or reopen it for the next two weeks.",
+    ar: "اضغط على تاريخ لإغلاقه أو إعادة فتحه للأسبوعين القادمين.",
+  },
+  adminNoUpcomingDates: {
+    he: "אין תאריכים זמינים — הפעילו לפחות יום אחד בשבוע.",
+    en: "No upcoming dates — enable at least one weekday.",
+    ar: "لا توجد تواريخ قريبة — فعّل يومًا واحدًا على الأقل في الأسبوع.",
+  },
+  adminDateOpen: { he: "פתוח", en: "Open", ar: "مفتوح" },
+  adminDateClosed: { he: "סגור", en: "Closed", ar: "مغلق" },
+  adminDateToggledClosed: {
+    he: "התאריך נסגר להזמנות",
+    en: "Date closed for orders",
+    ar: "تم إغلاق التاريخ للطلبات",
+  },
+  adminDateToggledOpen: {
+    he: "התאריך נפתח להזמנות",
+    en: "Date reopened for orders",
+    ar: "تم إعادة فتح التاريخ للطلبات",
   },
   restDaysTitle: { he: "ימי מנוחה", en: "Rest Days", ar: "أيام الراحة" },
   adminRestDaysSubtitle: {

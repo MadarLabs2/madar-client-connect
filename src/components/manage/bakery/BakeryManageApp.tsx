@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/card";
+import { useEffect } from "react";
 import { BakeryAdminLayout } from "@/components/manage/bakery/BakeryAdminLayout";
 import { BakeryDashboard } from "@/components/manage/bakery/BakeryDashboard";
 import { BakeryProductsPage } from "@/components/manage/bakery/BakeryProductsPage";
@@ -8,7 +9,6 @@ import { BakeryCouponsPage } from "@/components/manage/bakery/BakeryCouponsPage"
 import { BakeryOffersPage } from "@/components/manage/bakery/BakeryOffersPage";
 import { BakerySettingsPage } from "@/components/manage/bakery/BakerySettingsPage";
 import { BakeryAvailabilityPage } from "@/components/manage/bakery/BakeryAvailabilityPage";
-import { BakeryRestDaysPage } from "@/components/manage/bakery/BakeryRestDaysPage";
 import { BakeryReportsPage } from "@/components/manage/bakery/BakeryReportsPage";
 import { useBakeryT } from "@/lib/bakery/i18n";
 
@@ -30,7 +30,6 @@ const CREDENTIAL_TABS = new Set([
   "reports",
   "settings",
   "availability",
-  "rest-days",
 ]);
 
 export function BakeryManageApp({
@@ -42,8 +41,12 @@ export function BakeryManageApp({
   onTabChange,
 }: BakeryManageAppProps) {
   const { t } = useBakeryT();
-  const activeTab = tab || "overview";
+  const activeTab = tab === "rest-days" ? "availability" : tab || "overview";
   const needsCredentials = CREDENTIAL_TABS.has(activeTab);
+
+  useEffect(() => {
+    if (tab === "rest-days") onTabChange("availability");
+  }, [tab, onTabChange]);
 
   const renderTab = () => {
     if (needsCredentials && !hasCredentials) {
@@ -75,7 +78,6 @@ export function BakeryManageApp({
     if (activeTab === "settings") return <BakerySettingsPage projectId={projectId} />;
     if (activeTab === "offers") return <BakeryOffersPage projectId={projectId} />;
     if (activeTab === "availability") return <BakeryAvailabilityPage projectId={projectId} />;
-    if (activeTab === "rest-days") return <BakeryRestDaysPage projectId={projectId} />;
     return (
       <BakeryDashboard
         projectId={projectId}

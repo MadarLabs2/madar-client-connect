@@ -1,14 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, Loader2, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBakeryDb } from "@/lib/bakery/db";
 import {
+  buildScheduleDateOptions,
+  enabledDaysFromMap,
   fetchFulfillmentDays,
   rowsToWeekdayMap,
   saveFulfillmentAvailability,
+  type ScheduleDateOption,
   type WeekdayAvailability,
 } from "@/lib/bakery/fulfillmentDays";
 import { WEEKDAY_DICT_KEYS } from "@/lib/bakery/fulfillmentDays-i18n";
+import { fetchAdminRestDays, toggleDateClosure, type RestDayRow } from "@/lib/bakery/restDays";
 import { useBakeryT } from "@/lib/bakery/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -62,39 +66,137 @@ function WeekdayToggleGrid({
   );
 }
 
+function UpcomingDatesGrid({
+  title,
+  dates,
+  togglingDate,
+  onToggle,
+}: {
+  title: string;
+  dates: ScheduleDateOption[];
+  togglingDate: string | null;
+  onToggle: (isoDate: string) => void;
+}) {
+  const { t } = useBakeryT();
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <h4 className="font-display text-sm font-semibold text-[#1B4332]">{title}</h4>
+        <p className="mt-0.5 text-xs text-muted-foreground">{t("adminUpcomingDatesDescription")}</p>
+      </div>
+
+      {dates.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-stone-200 bg-stone-50/80 px-4 py-6 text-center text-sm text-muted-foreground">
+          {t("adminNoUpcomingDates")}
+        </p>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {dates.map((option) => {
+            const busy = togglingDate === option.isoDate;
+            return (
+              <button
+                key={option.isoDate}
+                type="button"
+                disabled={busy}
+                aria-pressed={option.isOpen}
+                onClick={() => onToggle(option.isoDate)}
+                className={cn(
+                  "flex items-center justify-between gap-3 rounded-xl border-2 px-4 py-3 text-start text-sm transition-all",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B4332]/50 focus-visible:ring-offset-2",
+                  "disabled:cursor-wait disabled:opacity-70",
+                  option.isOpen
+                    ? "border-[#1B4332]/25 bg-white text-[#1B4332] hover:border-[#1B4332]/50 hover:bg-[#faf8f4]"
+                    : "border-stone-300/80 bg-stone-100 text-stone-500 line-through decoration-stone-400/80",
+                )}
+              >
+                <span className="font-medium">{option.label}</span>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                    option.isOpen
+                      ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80"
+                      : "bg-stone-200/80 text-stone-600 ring-1 ring-stone-300/60",
+                  )}
+                >
+                  {busy ? (
+                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                  ) : option.isOpen ? (
+                    t("adminDateOpen")
+                  ) : (
+                    t("adminDateClosed")
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BakeryAvailabilityPage({ projectId }: BakeryAvailabilityPageProps) {
   const db = useBakeryDb(projectId);
   const { t } = useBakeryT();
   const [pickup, setPickup] = useState<WeekdayAvailability>({ ...EMPTY_WEEK, 2: true, 5: true });
   const [delivery, setDelivery] = useState<WeekdayAvailability>({ ...EMPTY_WEEK, 2: true, 5: true });
+  const [restDays, setRestDays] = useState<RestDayRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [togglingDate, setTogglingDate] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [needsMigration, setNeedsMigration] = useState(false);
+
+  const weekdayLabel = useCallback(
+    (dayOfWeek: number) => t(WEEKDAY_DICT_KEYS[dayOfWeek] ?? "weekdaySunday"),
+    [t],
+  );
+
+  const load = useCallback(async () => {
+    const [daysResult, restResult] = await Promise.all([
+      fetchFulfillmentDays(db),
+      fetchAdminRestDays(db),
+    ]);
+
+    if (!daysResult.ok) {
+      const missingTable = daysResult.message.includes("fulfillment_available_days");
+      setNeedsMigration(missingTable);
+      setLoadError(missingTable ? t("adminOrderAvailabilityMigrationHint") : daysResult.message);
+      toast.error(t("adminOrderAvailabilityLoadError"));
+      setLoading(false);
+      return;
+    }
+
+    setLoadError(null);
+    setNeedsMigration(false);
+    setPickup(rowsToWeekdayMap(daysResult.rows, "pickup"));
+    setDelivery(rowsToWeekdayMap(daysResult.rows, "delivery"));
+    setRestDays(restResult.ok ? restResult.rows : []);
+    setLoading(false);
+  }, [db, t]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const result = await fetchFulfillmentDays(db);
+      setLoading(true);
+      await load();
       if (cancelled) return;
-      if (!result.ok) {
-        const missingTable = result.message.includes("fulfillment_available_days");
-        setNeedsMigration(missingTable);
-        setLoadError(missingTable ? t("adminOrderAvailabilityMigrationHint") : result.message);
-        toast.error(t("adminOrderAvailabilityLoadError"));
-        setLoading(false);
-        return;
-      }
-      setLoadError(null);
-      setNeedsMigration(false);
-      setPickup(rowsToWeekdayMap(result.rows, "pickup"));
-      setDelivery(rowsToWeekdayMap(result.rows, "delivery"));
-      setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [db, t]);
+  }, [load]);
+
+  const pickupDates = useMemo(
+    () => buildScheduleDateOptions(enabledDaysFromMap(pickup), weekdayLabel, restDays),
+    [pickup, restDays, weekdayLabel],
+  );
+
+  const deliveryDates = useMemo(
+    () => buildScheduleDateOptions(enabledDaysFromMap(delivery), weekdayLabel, restDays),
+    [delivery, restDays, weekdayLabel],
+  );
 
   const save = async () => {
     setSaving(true);
@@ -111,6 +213,21 @@ export function BakeryAvailabilityPage({ projectId }: BakeryAvailabilityPageProp
     }
 
     toast.success(t("availabilitySavedSuccess"));
+  };
+
+  const handleToggleDate = async (isoDate: string) => {
+    setTogglingDate(isoDate);
+    const result = await toggleDateClosure(db, isoDate);
+    setTogglingDate(null);
+
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
+    toast.success(result.isNowClosed ? t("adminDateToggledClosed") : t("adminDateToggledOpen"));
+    const restResult = await fetchAdminRestDays(db);
+    if (restResult.ok) setRestDays(restResult.rows);
   };
 
   return (
@@ -157,19 +274,42 @@ export function BakeryAvailabilityPage({ projectId }: BakeryAvailabilityPageProp
             </div>
           ) : (
             <>
-              <WeekdayToggleGrid
-                title={t("pickupAvailabilityTitle")}
-                description={t("choosePickupDay")}
-                values={pickup}
-                onChange={setPickup}
-              />
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-display text-base font-semibold text-[#1B4332]">
+                    {t("adminRecurringDaysTitle")}
+                  </h3>
+                  <p className="mt-0.5 text-sm text-muted-foreground">{t("adminRecurringDaysDescription")}</p>
+                </div>
 
-              <div className="border-t border-[#1B4332]/10 pt-8">
+                <WeekdayToggleGrid
+                  title={t("pickupAvailabilityTitle")}
+                  description={t("choosePickupDay")}
+                  values={pickup}
+                  onChange={setPickup}
+                />
+
+                <UpcomingDatesGrid
+                  title={`${t("adminUpcomingDatesTitle")} — ${t("pickupAvailabilityTitle")}`}
+                  dates={pickupDates}
+                  togglingDate={togglingDate}
+                  onToggle={(iso) => void handleToggleDate(iso)}
+                />
+              </div>
+
+              <div className="space-y-6 border-t border-[#1B4332]/10 pt-8">
                 <WeekdayToggleGrid
                   title={t("deliveryAvailabilityTitle")}
                   description={t("chooseDeliveryDay")}
                   values={delivery}
                   onChange={setDelivery}
+                />
+
+                <UpcomingDatesGrid
+                  title={`${t("adminUpcomingDatesTitle")} — ${t("deliveryAvailabilityTitle")}`}
+                  dates={deliveryDates}
+                  togglingDate={togglingDate}
+                  onToggle={(iso) => void handleToggleDate(iso)}
                 />
               </div>
 

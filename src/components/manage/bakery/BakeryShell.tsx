@@ -72,7 +72,7 @@ const navItems: NavItem[] = [
   },
   {
     id: "settings",
-    match: (tab) => tab === "settings" || tab === "availability" || tab === "rest-days",
+    match: (tab) => tab === "settings" || tab === "availability",
     labelKey: "adminNavSettings",
     icon: SlidersHorizontal,
   },

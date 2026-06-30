@@ -91,10 +91,14 @@ function ManageProject() {
     : "overview";
 
   useEffect(() => {
+    if (!isLoading && info?.manageTemplate === "bakery" && tab === "rest-days") {
+      navigate({ to: ".", search: { tab: "availability" }, params: { projectId }, replace: true });
+      return;
+    }
     if (!isLoading && tab !== resolvedTab) {
       navigate({ to: ".", search: { tab: resolvedTab }, params: { projectId }, replace: true });
     }
-  }, [isLoading, tab, resolvedTab, navigate, projectId]);
+  }, [isLoading, tab, resolvedTab, navigate, projectId, info?.manageTemplate]);
 
   if (isLoading) {
     return <BakeryAdminLoadingScreen />;
