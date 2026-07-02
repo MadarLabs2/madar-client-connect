@@ -13,15 +13,18 @@ import {
   upsertActivity,
   toggleActivity,
   deleteActivity,
-  addCommunication,
+  upsertCommunication,
   deleteCommunication,
   upsertInvoice,
   deleteInvoice,
   getCrmOverview,
 } from "@/lib/crm.functions";
 import {
+  crmDateToIso,
   crmDatetimeLocalToIso,
+  crmIsoToDateInput,
   crmIsoToDatetimeLocal,
+  formatCrmDate,
   formatCrmDateTime,
 } from "@/lib/crm-datetime";
 import { Button } from "@/components/ui/button";
@@ -549,7 +552,7 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
   const saveAct = useServerFn(upsertActivity);
   const toggleAct = useServerFn(toggleActivity);
   const removeAct = useServerFn(deleteActivity);
-  const addComm = useServerFn(addCommunication);
+  const saveComm = useServerFn(upsertCommunication);
   const removeComm = useServerFn(deleteCommunication);
   const saveInv = useServerFn(upsertInvoice);
   const removeInv = useServerFn(deleteInvoice);
@@ -561,8 +564,10 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
 
   const [actForm, setActForm] = useState({ type: "task" as ActivityType, title: "", description: "", due_date: "" });
   const [editingActId, setEditingActId] = useState<string | null>(null);
-  const [commForm, setCommForm] = useState({ channel: "phone" as CommChannel, direction: "out" as "in" | "out", content: "" });
+  const [commForm, setCommForm] = useState({ channel: "phone" as CommChannel, direction: "out" as "in" | "out", content: "", occurred_at: "" });
+  const [editingCommId, setEditingCommId] = useState<string | null>(null);
   const [invForm, setInvForm] = useState({ number: "", amount: 0, currency: "ILS", status: "draft" as InvoiceStatus, due_date: "" });
+  const [editingInvId, setEditingInvId] = useState<string | null>(null);
 
   const data = leadQ.data;
   const lead = data?.lead as LeadRow | undefined;
@@ -626,13 +631,68 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
     catch (err) { toast.error(err instanceof Error ? err.message : "שגיאה"); }
   }
 
+  function resetCommForm() {
+    setCommForm({ channel: "phone", direction: "out", content: "", occurred_at: "" });
+    setEditingCommId(null);
+  }
+
+  function startEditComm(c: {
+    id: string;
+    channel: string;
+    direction: string;
+    content: string;
+    occurred_at: string;
+  }) {
+    setEditingCommId(c.id);
+    setCommForm({
+      channel: c.channel as CommChannel,
+      direction: c.direction as "in" | "out",
+      content: c.content,
+      occurred_at: crmIsoToDatetimeLocal(c.occurred_at),
+    });
+  }
+
+  function resetInvForm() {
+    setInvForm({ number: "", amount: 0, currency: "ILS", status: "draft", due_date: "" });
+    setEditingInvId(null);
+  }
+
+  function startEditInvoice(inv: {
+    id: string;
+    number: string | null;
+    amount: number;
+    currency: string;
+    status: string;
+    due_date: string | null;
+  }) {
+    setEditingInvId(inv.id);
+    setInvForm({
+      number: inv.number ?? "",
+      amount: Number(inv.amount ?? 0),
+      currency: inv.currency ?? "ILS",
+      status: inv.status as InvoiceStatus,
+      due_date: crmIsoToDateInput(inv.due_date),
+    });
+  }
+
   async function handleAddComm(e: React.FormEvent) {
     e.preventDefault();
     if (!commForm.content.trim()) return;
     try {
-      await addComm({ data: { lead_id: leadId, ...commForm } });
-      setCommForm({ channel: "phone", direction: "out", content: "" });
+      const wasEditing = Boolean(editingCommId);
+      await saveComm({
+        data: {
+          id: editingCommId ?? undefined,
+          lead_id: leadId,
+          channel: commForm.channel,
+          direction: commForm.direction,
+          content: commForm.content,
+          occurred_at: crmDatetimeLocalToIso(commForm.occurred_at),
+        },
+      });
+      resetCommForm();
       invalidate();
+      toast.success(wasEditing ? "הרישום עודכן" : "הרישום נוסף");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "שגיאה");
     }
@@ -646,9 +706,21 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
   async function handleAddInvoice(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await saveInv({ data: { lead_id: leadId, ...invForm, due_date: invForm.due_date || null } });
-      setInvForm({ number: "", amount: 0, currency: "ILS", status: "draft", due_date: "" });
+      const wasEditing = Boolean(editingInvId);
+      await saveInv({
+        data: {
+          id: editingInvId ?? undefined,
+          lead_id: leadId,
+          number: invForm.number,
+          amount: invForm.amount,
+          currency: invForm.currency,
+          status: invForm.status,
+          due_date: crmDateToIso(invForm.due_date),
+        },
+      });
+      resetInvForm();
       invalidate();
+      toast.success(wasEditing ? "החשבונית עודכנה" : "החשבונית נוספה");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "שגיאה");
     }
@@ -776,6 +848,9 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
 
               <TabsContent value="comms" className="space-y-3 pt-3">
                 <form onSubmit={handleAddComm} className="space-y-2 rounded-md border p-3 bg-muted/20">
+                  {editingCommId && (
+                    <p className="text-xs font-medium text-primary">עריכת רישום תקשורת</p>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={commForm.channel} onValueChange={(v) => setCommForm({ ...commForm, channel: v as CommChannel })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -793,8 +868,23 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
                       </SelectContent>
                     </Select>
                   </div>
+                  <Input
+                    type="datetime-local"
+                    value={commForm.occurred_at}
+                    onChange={(e) => setCommForm({ ...commForm, occurred_at: e.target.value })}
+                  />
                   <Textarea rows={2} placeholder="תוכן השיחה / הודעה" value={commForm.content} onChange={(e) => setCommForm({ ...commForm, content: e.target.value })} />
-                  <Button type="submit" size="sm"><Plus className="ml-1 h-3.5 w-3.5" />רישום</Button>
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm">
+                      {editingCommId ? <Pencil className="ml-1 h-3.5 w-3.5" /> : <Plus className="ml-1 h-3.5 w-3.5" />}
+                      {editingCommId ? "עדכן" : "רישום"}
+                    </Button>
+                    {editingCommId && (
+                      <Button type="button" size="sm" variant="outline" onClick={resetCommForm}>
+                        ביטול
+                      </Button>
+                    )}
+                  </div>
                 </form>
                 <div className="space-y-2">
                   {data?.communications.map((c) => (
@@ -809,10 +899,13 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>{CHANNEL_LABEL[c.channel as CommChannel]}</span>
                           <span>{c.direction === "in" ? "נכנס →" : "יוצא ←"}</span>
-                          <span>{new Date(c.occurred_at).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" })}</span>
+                          <span>{formatCrmDateTime(c.occurred_at)}</span>
                         </div>
                         <p className="mt-1 text-sm whitespace-pre-wrap">{c.content}</p>
                       </div>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditComm(c)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteComm(c.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -826,6 +919,9 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
 
               <TabsContent value="invoices" className="space-y-3 pt-3">
                 <form onSubmit={handleAddInvoice} className="space-y-2 rounded-md border p-3 bg-muted/20">
+                  {editingInvId && (
+                    <p className="text-xs font-medium text-primary">עריכת חשבונית</p>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     <Input placeholder="מס׳ חשבונית" value={invForm.number} onChange={(e) => setInvForm({ ...invForm, number: e.target.value })} />
                     <Input type="number" placeholder="סכום" value={invForm.amount} onChange={(e) => setInvForm({ ...invForm, amount: Number(e.target.value) })} />
@@ -849,7 +945,17 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
                     </Select>
                     <Input type="date" value={invForm.due_date} onChange={(e) => setInvForm({ ...invForm, due_date: e.target.value })} />
                   </div>
-                  <Button type="submit" size="sm"><Plus className="ml-1 h-3.5 w-3.5" />חשבונית</Button>
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm">
+                      {editingInvId ? <Pencil className="ml-1 h-3.5 w-3.5" /> : <Plus className="ml-1 h-3.5 w-3.5" />}
+                      {editingInvId ? "עדכן" : "חשבונית"}
+                    </Button>
+                    {editingInvId && (
+                      <Button type="button" size="sm" variant="outline" onClick={resetInvForm}>
+                        ביטול
+                      </Button>
+                    )}
+                  </div>
                 </form>
                 <div className="space-y-2">
                   {data?.invoices.map((inv) => (
@@ -859,9 +965,12 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
                       </Badge>
                       <div className="flex-1 text-sm">
                         <div className="font-medium">{inv.number || "—"}</div>
-                        {inv.due_date && <div className="text-xs text-muted-foreground">לתשלום: {new Date(inv.due_date).toLocaleDateString("he-IL")}</div>}
+                        {inv.due_date && <div className="text-xs text-muted-foreground">לתשלום: {formatCrmDate(inv.due_date)}</div>}
                       </div>
                       <div className="tabular-nums font-medium">{fmt(Number(inv.amount), inv.currency)}</div>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditInvoice(inv)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteInv(inv.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>

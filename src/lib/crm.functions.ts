@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/external-db/auth-middleware";
 import { supabaseAdmin as extAdmin } from "@/integrations/external-db/client.server";
 import { supabaseAdmin as cloudAdmin } from "@/integrations/supabase/client.server";
-import { crmDatetimeLocalToIso, getJerusalemTodayRangeUtc } from "@/lib/crm-datetime";
+import { crmDateToIso, crmDatetimeLocalToIso, getJerusalemTodayRangeUtc } from "@/lib/crm-datetime";
 
 async function assertAdmin(userId: string) {
   const { data, error } = await extAdmin
@@ -183,29 +183,43 @@ export const deleteActivity = createServerFn({ method: "POST" })
 
 // ============ Communications ============
 
-const AddCommSchema = z.object({
+const UpsertCommSchema = z.object({
+  id: z.string().uuid().optional(),
   lead_id: z.string().uuid(),
   channel: z.enum(COMM_CHANNELS),
   direction: z.enum(COMM_DIRECTIONS),
   content: z.string().min(1).max(5000),
-  occurred_at: z.string().optional(),
+  occurred_at: z.string().nullable().optional(),
 });
 
-export const addCommunication = createServerFn({ method: "POST" })
+export const upsertCommunication = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => AddCommSchema.parse(i))
+  .inputValidator((i) => UpsertCommSchema.parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const { error } = await cloudAdmin.from("lead_communications").insert({
+    const payload = {
       lead_id: data.lead_id,
       channel: data.channel,
       direction: data.direction,
       content: data.content,
-      occurred_at: data.occurred_at || new Date().toISOString(),
-    });
+      occurred_at: crmDatetimeLocalToIso(data.occurred_at ?? null) ?? new Date().toISOString(),
+    };
+    if (data.id) {
+      const { error } = await cloudAdmin.from("lead_communications").update(payload).eq("id", data.id);
+      if (error) throw new Error(error.message);
+      return { ok: true, id: data.id };
+    }
+    const { data: created, error } = await cloudAdmin
+      .from("lead_communications")
+      .insert(payload)
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, id: created.id };
   });
+
+/** @deprecated use upsertCommunication */
+export const addCommunication = upsertCommunication;
 
 export const deleteCommunication = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -244,16 +258,27 @@ export const upsertInvoice = createServerFn({ method: "POST" })
       currency: data.currency,
       status: data.status,
       issued_at: data.issued_at || null,
-      due_date: data.due_date || null,
-      paid_at: data.paid_at || (data.status === "paid" ? new Date().toISOString() : null),
+      due_date: crmDateToIso(data.due_date ?? null),
       notes: data.notes || null,
     };
     if (data.id) {
+      if (data.paid_at !== undefined) {
+        (payload as Record<string, unknown>).paid_at = data.paid_at;
+      } else if (data.status === "paid") {
+        (payload as Record<string, unknown>).paid_at = new Date().toISOString();
+      }
       const { error } = await cloudAdmin.from("lead_invoices").update(payload).eq("id", data.id);
       if (error) throw new Error(error.message);
       return { ok: true, id: data.id };
     }
-    const { data: created, error } = await cloudAdmin.from("lead_invoices").insert(payload).select("id").single();
+    const { data: created, error } = await cloudAdmin
+      .from("lead_invoices")
+      .insert({
+        ...payload,
+        paid_at: data.paid_at || (data.status === "paid" ? new Date().toISOString() : null),
+      })
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
     return { ok: true, id: created.id };
   });
