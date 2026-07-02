@@ -16,6 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { getNearestColorName } from "@/lib/namedProductColors";
+import { useEcommerceT } from "@/lib/ecommerce/i18n";
 
 type Size = { size: string; quantity: number };
 type Variant = { color: string; colorHex: string; images: string[]; sizes: Size[] };
@@ -74,6 +76,7 @@ const fileToBase64 = async (file: File) => {
 };
 
 export function ProductsManager({ projectId }: { projectId: string }) {
+  const { t } = useEcommerceT();
   const qc = useQueryClient();
   const listFn = useServerFn(projectList);
   const insertFn = useServerFn(projectInsert);
@@ -90,8 +93,10 @@ export function ProductsManager({ projectId }: { projectId: string }) {
     queryFn: () => listFn({ data: { projectId, table: "categories", limit: 200 } }),
   });
 
-  const products = (prodRes?.rows ?? []) as ProductRow[];
-  const categories = (catRes?.rows ?? []) as Array<{ id: string; name?: string }>;
+  const productRows: any[] = prodRes?.rows ?? [];
+  const categoryRows: any[] = catRes?.rows ?? [];
+  const products = productRows as ProductRow[];
+  const categories = categoryRows as Array<{ id: string; name?: string }>;
 
   const [query, setQuery] = useState("");
   const [form, setForm] = useState<ProductInput>(emptyForm);
@@ -160,25 +165,25 @@ export function ProductsManager({ projectId }: { projectId: string }) {
   };
 
   const onDelete = async (id: string) => {
-    if (!confirm("למחוק את המוצר?")) return;
+    if (!confirm(t("productsConfirmDelete"))) return;
     try {
       await deleteFn({ data: { projectId, table: "products", id } });
-      toast.success("נמחק");
+      toast.success(t("deleted"));
       if (form.id === id) reset();
       invalidate();
     } catch (e: any) {
-      toast.error(e.message || "המחיקה נכשלה");
+      toast.error(e.message || t("productsDeleteFailed"));
     }
   };
 
   const onSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.category || !form.price) {
-      toast.error("שם, קטגוריה ומחיר הם חובה.");
+      toast.error(t("productsValidationRequired"));
       return;
     }
     if (!form.variants?.length) {
-      toast.error("נדרש וריאנט אחד לפחות.");
+      toast.error(t("productsValidationVariant"));
       return;
     }
     setSaving(true);
@@ -190,11 +195,11 @@ export function ProductsManager({ projectId }: { projectId: string }) {
         const { id: _i, ...rest } = form;
         await insertFn({ data: { projectId, table: "products", row: rest } });
       }
-      toast.success("נשמר");
+      toast.success(t("saved"));
       reset();
       invalidate();
     } catch (e: any) {
-      toast.error(e.message || "השמירה נכשלה");
+      toast.error(e.message || t("productsSaveFailed"));
     } finally {
       setSaving(false);
     }
@@ -241,9 +246,9 @@ export function ProductsManager({ projectId }: { projectId: string }) {
       const images = [...(v.images ?? [])];
       images[iIdx] = res.url;
       setVariant(vIdx, { ...v, images });
-      toast.success("התמונה הועלתה");
+      toast.success(t("imageUploaded"));
     } catch (e: any) {
-      toast.error(e.message || "ההעלאה נכשלה");
+      toast.error(e.message || t("uploadFailed"));
     } finally {
       revokeBlob(key);
       setUploadingKey(null);
@@ -255,14 +260,14 @@ export function ProductsManager({ projectId }: { projectId: string }) {
       <Dialog open={!!previewUrl} onOpenChange={(o) => !o && setPreviewUrl(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>תמונת מוצר</DialogTitle>
+            <DialogTitle>{t("productImage")}</DialogTitle>
           </DialogHeader>
           {previewUrl && <img src={previewUrl} alt="" className="w-full" />}
         </DialogContent>
       </Dialog>
 
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-3xl">מוצרים</h1>
+        <h1 className="font-display text-3xl">{t("productsTitle")}</h1>
         <div className="flex items-center gap-2">
           <Button
             type="button"
@@ -274,12 +279,12 @@ export function ProductsManager({ projectId }: { projectId: string }) {
               );
             }}
           >
-            הוספת מוצר
+            {t("addProduct")}
           </Button>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="חיפוש…"
+            placeholder={t("search")}
             className="w-44 border-b border-border bg-transparent py-2 text-sm focus:border-foreground focus:outline-none sm:w-64"
           />
         </div>
@@ -289,14 +294,14 @@ export function ProductsManager({ projectId }: { projectId: string }) {
         {/* List */}
         <div className="space-y-3">
           {isLoading ? (
-            <div className="rounded border border-border p-4 text-sm text-muted-foreground">טוען…</div>
+            <div className="rounded border border-border p-4 text-sm text-muted-foreground">{t("loading")}</div>
           ) : isError || prodRes?.error ? (
             <div className="rounded border border-border p-4 text-sm">
-              <div>טעינת מוצרים נכשלה.</div>
+              <div>{t("productsLoadFailed")}</div>
               {prodRes?.error && <div className="mt-1 text-xs text-muted-foreground">{prodRes.error}</div>}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="rounded border border-border p-4 text-sm text-muted-foreground">לא נמצאו מוצרים.</div>
+            <div className="rounded border border-border p-4 text-sm text-muted-foreground">{t("noProducts")}</div>
           ) : (
             filtered.map((p) => {
               const thumb = getThumb(p);
@@ -313,7 +318,7 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                       </button>
                     ) : (
                       <div className="flex aspect-square w-20 shrink-0 items-center justify-center border border-dashed border-border bg-muted/50">
-                        <span className="text-[10px] uppercase text-muted-foreground">אין תמונה</span>
+                        <span className="text-[10px] uppercase text-muted-foreground">{t("noImage")}</span>
                       </div>
                     )}
                     <div className="min-w-0">
@@ -329,10 +334,10 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => onEdit(p)}>
-                      עריכה
+                      {t("productsEdit")}
                     </Button>
                     <Button size="sm" variant="destructive" onClick={() => onDelete(p.id)}>
-                      מחיקה
+                      {t("productsDelete")}
                     </Button>
                   </div>
                 </div>
@@ -343,10 +348,10 @@ export function ProductsManager({ projectId }: { projectId: string }) {
 
         {/* Editor */}
         <div ref={editorRef} className="border border-border p-4">
-          <h2 className="mb-4 text-xs uppercase tracking-widest text-muted-foreground">הוספה / עריכת מוצר</h2>
+          <h2 className="mb-4 text-xs uppercase tracking-widest text-muted-foreground">{t("editorTitle")}</h2>
           <form onSubmit={onSave} className="space-y-4">
             <div>
-              <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">שם</label>
+              <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">{t("name")}</label>
               <input
                 value={form.name}
                 onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
@@ -355,13 +360,13 @@ export function ProductsManager({ projectId }: { projectId: string }) {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">קטגוריה</label>
+              <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">{t("category")}</label>
               <select
                 value={form.category}
                 onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
                 className="w-full cursor-pointer border-b border-border bg-transparent py-3 text-sm focus:outline-none"
               >
-                <option value="">בחר…</option>
+                <option value="">{t("choose")}</option>
                 {categories.map((c: any) => (
                   <option key={c.id} value={c.id}>
                     {c.name || c.id}
@@ -372,7 +377,7 @@ export function ProductsManager({ projectId }: { projectId: string }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">מחיר</label>
+                <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">{t("price")}</label>
                 <input
                   type="number"
                   value={form.price}
@@ -381,7 +386,7 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">מחיר מקורי</label>
+                <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">{t("originalPrice")}</label>
                 <input
                   type="number"
                   value={form.original_price ?? ""}
@@ -400,10 +405,10 @@ export function ProductsManager({ projectId }: { projectId: string }) {
               <div key={field}>
                 <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">
                   {field === "description"
-                    ? "תיאור (עברית)"
+                    ? t("descHe")
                     : field === "description_en"
-                      ? "תיאור (אנגלית)"
-                      : "תיאור (ערבית)"}
+                      ? t("descEn")
+                      : t("descAr")}
                 </label>
                 <textarea
                   value={(form as any)[field] ?? ""}
@@ -422,12 +427,12 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                     onChange={(e) => setForm((p) => ({ ...p, [field]: e.target.checked }))}
                   />
                   <span className="text-sm">
-                    {field === "is_new" ? "חדש" : field === "is_featured" ? "מומלץ" : "במבצע"}
+                    {field === "is_new" ? t("badgeNew") : field === "is_featured" ? t("badgeFeatured") : t("badgeSale")}
                   </span>
                 </label>
               ))}
               <div>
-                <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">פופולריות</label>
+                <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">{t("popularity")}</label>
                 <input
                   type="number"
                   value={form.popularity ?? 0}
@@ -440,26 +445,28 @@ export function ProductsManager({ projectId }: { projectId: string }) {
             {/* Variants */}
             <div className="border border-border">
               <div className="flex items-center justify-between border-b border-border p-3">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground">וריאנטים</p>
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">{t("variants")}</p>
                 <Button type="button" size="sm" variant="outline" onClick={addVariant}>
-                  הוסף וריאנט
+                  {t("addVariant")}
                 </Button>
               </div>
               <div className="space-y-4 p-3">
                 {(form.variants ?? []).map((v, idx) => (
                   <div key={idx} className="border border-border p-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs uppercase tracking-widest text-muted-foreground">וריאנט #{idx + 1}</p>
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                        {t("variantN", { n: idx + 1 })}
+                      </p>
                       {(form.variants?.length ?? 0) > 1 && (
                         <Button type="button" size="sm" variant="destructive" onClick={() => removeVariant(idx)}>
-                          הסר
+                          {t("remove")}
                         </Button>
                       )}
                     </div>
 
                     <div className="mt-3 grid grid-cols-2 gap-4">
                       <div>
-                        <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">צבע</label>
+                        <label className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground">{t("color")}</label>
                         <input
                           value={v.color}
                           onChange={(e) => setVariant(idx, { ...v, color: e.target.value })}
@@ -472,7 +479,14 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                           <input
                             type="color"
                             value={v.colorHex || "#000000"}
-                            onChange={(e) => setVariant(idx, { ...v, colorHex: e.target.value })}
+                            onChange={(e) => {
+                              const nextHex = e.target.value;
+                              setVariant(idx, {
+                                ...v,
+                                colorHex: nextHex,
+                                color: getNearestColorName(nextHex),
+                              });
+                            }}
                             className="h-9 w-12 cursor-pointer border border-border bg-transparent p-1"
                           />
                           <input
@@ -481,15 +495,18 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                             className="flex-1 border-b border-border bg-transparent py-2 text-sm focus:outline-none"
                           />
                         </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {t("colorName", { name: getNearestColorName(v.colorHex || "#000000") })}
+                        </p>
                       </div>
                     </div>
 
                     {/* Images */}
                     <div className="mt-4">
                       <div className="mb-2 flex items-center justify-between">
-                        <p className="text-xs uppercase tracking-widest text-muted-foreground">תמונות</p>
+                        <p className="text-xs uppercase tracking-widest text-muted-foreground">{t("images")}</p>
                         <Button type="button" size="sm" variant="outline" onClick={() => addImage(idx)}>
-                          הוסף תמונה
+                          {t("addImage")}
                         </Button>
                       </div>
                       <div className="space-y-3">
@@ -507,13 +524,13 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                                   <img src={display} alt="" className="h-full w-full object-cover" />
                                   {uploadingKey === key && (
                                     <span className="absolute inset-0 flex items-center justify-center bg-background/70 text-[10px] uppercase">
-                                      מעלה…
+                                      {t("uploading")}
                                     </span>
                                   )}
                                 </button>
                               ) : (
                                 <div className="flex aspect-square w-24 shrink-0 items-center justify-center border border-dashed border-border bg-muted/50 text-[10px] uppercase text-muted-foreground">
-                                  אין תצוגה
+                                  {t("noPreview")}
                                 </div>
                               )}
                               <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -529,7 +546,7 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                                 />
                                 <div className="flex flex-wrap gap-2">
                                   <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:bg-muted">
-                                    {uploadingKey === key ? "מעלה…" : "העלה תמונה"}
+                                    {uploadingKey === key ? t("uploading") : t("uploadImage")}
                                     <input
                                       type="file"
                                       accept="image/*"
@@ -552,7 +569,7 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                                       setVariant(idx, { ...v, images });
                                     }}
                                   >
-                                    הסר
+                                    {t("remove")}
                                   </Button>
                                 </div>
                               </div>
@@ -560,7 +577,7 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                           );
                         })}
                         {(v.images ?? []).length === 0 && (
-                          <p className="text-sm text-muted-foreground">אין תמונות.</p>
+                          <p className="text-sm text-muted-foreground">{t("noImages")}</p>
                         )}
                       </div>
                     </div>
@@ -568,9 +585,9 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                     {/* Sizes */}
                     <div className="mt-4">
                       <div className="mb-2 flex items-center justify-between">
-                        <p className="text-xs uppercase tracking-widest text-muted-foreground">מידות</p>
+                        <p className="text-xs uppercase tracking-widest text-muted-foreground">{t("sizes")}</p>
                         <Button type="button" size="sm" variant="outline" onClick={() => addSize(idx)}>
-                          הוסף מידה
+                          {t("addSize")}
                         </Button>
                       </div>
                       <div className="space-y-2">
@@ -584,7 +601,7 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                                 setVariant(idx, { ...v, sizes });
                               }}
                               className="border-b border-border bg-transparent py-2 text-sm focus:outline-none"
-                              placeholder="מידה"
+                              placeholder={t("size")}
                             />
                             <input
                               type="number"
@@ -595,7 +612,7 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                                 setVariant(idx, { ...v, sizes });
                               }}
                               className="border-b border-border bg-transparent py-2 text-sm focus:outline-none"
-                              placeholder="כמות"
+                              placeholder={t("quantity")}
                             />
                             <Button
                               type="button"
@@ -606,12 +623,12 @@ export function ProductsManager({ projectId }: { projectId: string }) {
                                 setVariant(idx, { ...v, sizes });
                               }}
                             >
-                              הסר
+                              {t("remove")}
                             </Button>
                           </div>
                         ))}
                         {(v.sizes ?? []).length === 0 && (
-                          <p className="text-sm text-muted-foreground">אין מידות.</p>
+                          <p className="text-sm text-muted-foreground">{t("noSizes")}</p>
                         )}
                       </div>
                     </div>
@@ -622,10 +639,10 @@ export function ProductsManager({ projectId }: { projectId: string }) {
 
             <div className="flex gap-3">
               <Button type="submit" className="flex-1" disabled={saving}>
-                {saving ? "שומר…" : "שמירה"}
+                {saving ? t("saving") : t("save")}
               </Button>
               <Button type="button" variant="outline" className="flex-1" onClick={reset}>
-                נקה
+                {t("clear")}
               </Button>
             </div>
           </form>

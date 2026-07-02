@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, Search } from "lucide-react";
+import { formatEcommerceDateTime, type EcommerceLang, useEcommerceT } from "@/lib/ecommerce/i18n";
 
 type CouponRow = {
   id: string;
@@ -27,17 +28,16 @@ function localDateTimeToIso(local: string): string {
   return d.toISOString();
 }
 
-function fmtExpiry(iso: string) {
+function fmtExpiry(iso: string, lang: EcommerceLang) {
   try {
-    return new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short" }).format(
-      new Date(iso)
-    );
+    return formatEcommerceDateTime(iso, lang, { dateStyle: "short", timeStyle: "short" });
   } catch {
     return iso;
   }
 }
 
 export function CouponsManager({ projectId }: { projectId: string }) {
+  const { t, lang } = useEcommerceT();
   const qc = useQueryClient();
   const listFn = useServerFn(projectList);
   const insertFn = useServerFn(projectInsert);
@@ -80,11 +80,11 @@ export function CouponsManager({ projectId }: { projectId: string }) {
     e.preventDefault();
     const p = parseInt(percent, 10);
     if (!code.trim() || !expiresLocal || Number.isNaN(p)) {
-      toast.error("נא למלא קוד, אחוז ותוקף");
+      toast.error(t("couponsFillFields"));
       return;
     }
     if (p < 1 || p > 100) {
-      toast.error("אחוז בין 1 ל־100");
+      toast.error(t("percentRange"));
       return;
     }
     setSaving(true);
@@ -97,39 +97,39 @@ export function CouponsManager({ projectId }: { projectId: string }) {
           row: { code: code.trim().toUpperCase(), discount_percent: p, expires_at, active: true },
         },
       });
-      toast.success("הקופון נוסף");
+      toast.success(t("couponAdded"));
       setCode("");
       setPercent("10");
       setExpiresLocal("");
       invalidate();
     } catch (err: any) {
-      toast.error(err?.message || "שמירה נכשלה");
+      toast.error(err?.message || t("loadFailed"));
     } finally {
       setSaving(false);
     }
   };
 
   const onDelete = async (id: string) => {
-    if (!confirm("למחוק את הקופון?")) return;
+    if (!confirm(t("couponsConfirmDelete"))) return;
     try {
       await deleteFn({ data: { projectId, table: "coupons", id } });
-      toast.success("נמחק");
+      toast.success(t("deleted"));
       invalidate();
     } catch (err: any) {
-      toast.error(err?.message || "מחיקה נכשלה");
+      toast.error(err?.message || t("deleteFailed"));
     }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-3xl">קופונים</h1>
+        <h1 className="font-display text-3xl">{t("couponsTitle")}</h1>
         <div className="relative">
           <Search className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="חיפוש…"
+            placeholder={t("search")}
             className="w-56 pr-7"
           />
         </div>
@@ -138,22 +138,22 @@ export function CouponsManager({ projectId }: { projectId: string }) {
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <Card className="overflow-hidden">
           {isLoading ? (
-            <div className="p-6 text-sm text-muted-foreground">טוען…</div>
+            <div className="p-6 text-sm text-muted-foreground">{t("loading")}</div>
           ) : data?.error ? (
             <div className="p-6 text-sm">
-              <div className="font-medium">לא ניתן לטעון את הטבלה</div>
+              <div className="font-medium">{t("errorLoadTable")}</div>
               <div className="mt-1 text-muted-foreground">{data.error}</div>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">אין קופונים עדיין.</div>
+            <div className="p-6 text-sm text-muted-foreground">{t("noCoupons")}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/30 text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-3 py-2 text-right font-medium">קוד</th>
-                    <th className="px-3 py-2 text-right font-medium">הנחה</th>
-                    <th className="px-3 py-2 text-right font-medium">תוקף</th>
+                    <th className="px-3 py-2 text-right font-medium">{t("code")}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t("discountCol")}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t("expiry")}</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
@@ -163,11 +163,11 @@ export function CouponsManager({ projectId }: { projectId: string }) {
                       <td className="px-3 py-2 text-right font-mono text-xs">
                         {c.code}
                         {!c.active && (
-                          <span className="ml-2 text-[10px] text-muted-foreground">(לא פעיל)</span>
+                          <span className="ml-2 text-[10px] text-muted-foreground">{t("inactive")}</span>
                         )}
                       </td>
                       <td className="px-3 py-2 text-right">−{c.discount_percent}%</td>
-                      <td className="px-3 py-2 text-right">{fmtExpiry(c.expires_at)}</td>
+                      <td className="px-3 py-2 text-right">{fmtExpiry(c.expires_at, lang)}</td>
                       <td className="px-3 py-2">
                         <div className="flex justify-end">
                           <Button size="icon" variant="ghost" onClick={() => onDelete(c.id)}>
@@ -186,11 +186,11 @@ export function CouponsManager({ projectId }: { projectId: string }) {
         <Card className="p-4">
           <h2 className="mb-4 flex items-center gap-2 font-display text-lg">
             <Plus className="h-4 w-4" />
-            קופון חדש
+            {t("newCoupon")}
           </h2>
           <form onSubmit={onSave} className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">קוד קופון</Label>
+              <Label className="text-xs text-muted-foreground">{t("couponCode")}</Label>
               <Input
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
@@ -201,7 +201,7 @@ export function CouponsManager({ projectId }: { projectId: string }) {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">אחוז הנחה</Label>
+              <Label className="text-xs text-muted-foreground">{t("discountPercent")}</Label>
               <Input
                 type="number"
                 min={1}
@@ -212,7 +212,7 @@ export function CouponsManager({ projectId }: { projectId: string }) {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">תאריך ושעת תפוגה</Label>
+              <Label className="text-xs text-muted-foreground">{t("expiryDateTime")}</Label>
               <Input
                 type="datetime-local"
                 value={expiresLocal}
@@ -221,7 +221,7 @@ export function CouponsManager({ projectId }: { projectId: string }) {
             </div>
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={saving} className="flex-1">
-                {saving ? "שומר…" : "הוספה"}
+                {saving ? t("saving") : t("add")}
               </Button>
               <Button
                 type="button"
@@ -233,7 +233,7 @@ export function CouponsManager({ projectId }: { projectId: string }) {
                 }}
                 className="flex-1"
               >
-                נקה
+                {t("clear")}
               </Button>
             </div>
           </form>

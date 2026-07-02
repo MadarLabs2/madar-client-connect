@@ -7,6 +7,7 @@ import {
   projectList,
   projectUpdate,
   projectDelete,
+  ecommerceOrdersList,
 } from "@/lib/project-db.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Search, Eye, Trash2, Ban, CheckCircle2, ShoppingCart } from "lucide-react";
+import { formatEcommerceDateTime, formatEcommerceNumber, useEcommerceT } from "@/lib/ecommerce/i18n";
 
 type CustomerRow = {
   id: string;
@@ -33,9 +35,12 @@ type CustomerRow = {
 };
 
 export function CustomersManager({ projectId }: { projectId: string }) {
+  const { t, lang } = useEcommerceT();
+  const formatCount = (n: number) => formatEcommerceNumber(n, lang);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const listFn = useServerFn(projectList);
+  const ordersListFn = useServerFn(ecommerceOrdersList);
   const updateFn = useServerFn(projectUpdate);
   const deleteFn = useServerFn(projectDelete);
 
@@ -51,8 +56,8 @@ export function CustomersManager({ projectId }: { projectId: string }) {
   });
 
   const { data: ordersRes } = useQuery({
-    queryKey: ["pdb", projectId, "orders"],
-    queryFn: () => listFn({ data: { projectId, table: "orders", limit: 500 } }),
+    queryKey: ["ecommerce", projectId, "orders", "all"],
+    queryFn: () => ordersListFn({ data: { projectId, limit: 500 } }),
   });
 
   const customers: CustomerRow[] = useMemo(() => {
@@ -61,19 +66,26 @@ export function CustomersManager({ projectId }: { projectId: string }) {
     const counts = new Map<string, number>();
     for (const o of orders) {
       const uid = String(o.user_id ?? "");
-      if (!uid) continue;
-      counts.set(uid, (counts.get(uid) ?? 0) + 1);
+      const email = String(o.customer_email ?? "").trim().toLowerCase();
+      if (uid) counts.set(uid, (counts.get(uid) ?? 0) + 1);
+      if (email) counts.set(`email:${email}`, (counts.get(`email:${email}`) ?? 0) + 1);
     }
-    return rows.map((r) => ({
-      id: String(r.id ?? ""),
-      full_name: String(r.full_name ?? r.name ?? ""),
-      email: String(r.email ?? ""),
-      phone: String(r.phone ?? ""),
-      role: String(r.role ?? "customer"),
-      is_blocked: Boolean(r.is_blocked),
-      created_at: String(r.created_at ?? ""),
-      order_count: counts.get(String(r.id ?? "")) ?? 0,
-    }));
+    return rows.map((r) => {
+      const id = String(r.id ?? "");
+      const email = String(r.email ?? "").trim().toLowerCase();
+      const byUser = counts.get(id) ?? 0;
+      const byEmail = email ? counts.get(`email:${email}`) ?? 0 : 0;
+      return {
+        id,
+        full_name: String(r.full_name ?? r.name ?? ""),
+        email: String(r.email ?? ""),
+        phone: String(r.phone ?? ""),
+        role: String(r.role ?? "customer"),
+        is_blocked: Boolean(r.is_blocked),
+        created_at: String(r.created_at ?? ""),
+        order_count: Math.max(byUser, byEmail),
+      };
+    });
   }, [profilesRes, ordersRes]);
 
   const filtered = useMemo(() => {
@@ -108,11 +120,11 @@ export function CustomersManager({ projectId }: { projectId: string }) {
           row: { full_name: fullName, phone },
         },
       });
-      toast.success("נשמר");
+      toast.success(t("saved"));
       setSelected({ ...selected, full_name: fullName, phone });
       invalidate();
     } catch (e: any) {
-      toast.error(e?.message || "שמירה נכשלה");
+      toast.error(e?.message || t("loadFailed"));
     } finally {
       setSaving(false);
     }
@@ -130,23 +142,23 @@ export function CustomersManager({ projectId }: { projectId: string }) {
           row: { is_blocked: next },
         },
       });
-      toast.success(next ? "המשתמש נחסם" : "החסימה הוסרה");
+      toast.success(next ? t("blockSuccess") : t("unblockSuccess"));
       setSelected({ ...selected, is_blocked: next });
       invalidate();
     } catch (e: any) {
-      toast.error(e?.message || "פעולה נכשלה");
+      toast.error(e?.message || t("blockFailed"));
     }
   };
 
   const onDelete = async (id: string) => {
-    if (!confirm("למחוק את המשתמש לצמיתות?")) return;
+    if (!confirm(t("customersConfirmDelete"))) return;
     try {
       await deleteFn({ data: { projectId, table: "profiles", id } });
-      toast.success("נמחק");
+      toast.success(t("deleted"));
       if (selected?.id === id) setSelected(null);
       invalidate();
     } catch (e: any) {
-      toast.error(e?.message || "מחיקה נכשלה");
+      toast.error(e?.message || t("deleteFailed"));
     }
   };
 
@@ -155,13 +167,13 @@ export function CustomersManager({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-3xl">לקוחות</h1>
+        <h1 className="font-display text-3xl">{t("customersTitle")}</h1>
         <div className="relative">
           <Search className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="חיפוש…"
+            placeholder={t("search")}
             className="w-56 pr-7"
           />
         </div>
@@ -169,24 +181,24 @@ export function CustomersManager({ projectId }: { projectId: string }) {
 
       <Card className="overflow-hidden">
         {isLoading ? (
-          <div className="p-6 text-sm text-muted-foreground">טוען…</div>
+          <div className="p-6 text-sm text-muted-foreground">{t("loading")}</div>
         ) : profilesRes?.error ? (
           <div className="p-6 text-sm">
-            <div className="font-medium">לא ניתן לטעון את הטבלה</div>
+            <div className="font-medium">{t("errorLoadTable")}</div>
             <div className="mt-1 text-muted-foreground">{profilesRes.error}</div>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-6 text-sm text-muted-foreground">לא נמצאו לקוחות.</div>
+          <div className="p-6 text-sm text-muted-foreground">{t("noCustomers")}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/30 text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 text-right font-medium">שם</th>
-                  <th className="px-3 py-2 text-right font-medium">קשר</th>
-                  <th className="px-3 py-2 text-right font-medium">תפקיד</th>
-                  <th className="px-3 py-2 text-right font-medium">הזמנות</th>
-                  <th className="px-3 py-2 text-right font-medium">סטטוס</th>
+                  <th className="px-3 py-2 text-right font-medium">{t("customersName")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t("contact")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t("role")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t("ordersCol")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t("statusCol")}</th>
                   <th className="px-3 py-2"></th>
                 </tr>
               </thead>
@@ -196,7 +208,7 @@ export function CustomersManager({ projectId }: { projectId: string }) {
                     <td className="px-3 py-2 text-right">
                       <div>{c.full_name || "—"}</div>
                       <div className="text-xs text-muted-foreground">
-                        {new Date(c.created_at).toLocaleDateString()}
+                        {formatEcommerceDateTime(c.created_at, lang, { dateStyle: "short" })}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-right">
@@ -207,21 +219,35 @@ export function CustomersManager({ projectId }: { projectId: string }) {
                     </td>
                     <td className="px-3 py-2 text-right">
                       <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs">
-                        {c.role === "admin" ? "אדמין" : "לקוח"}
+                        {c.role === "admin" ? t("admin") : t("customerRole")}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-right">{c.order_count}</td>
+                    <td className="px-3 py-2 text-right">{formatCount(c.order_count)}</td>
                     <td className="px-3 py-2 text-right">
                       {c.is_blocked ? (
                         <span className="inline-flex rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
-                          חסום
+                          {t("blocked")}
                         </span>
                       ) : (
-                        <span className="text-xs text-muted-foreground">פעיל</span>
+                        <span className="text-xs text-muted-foreground">{t("active")}</span>
                       )}
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex justify-end gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title={t("ordersCol")}
+                          onClick={() =>
+                            navigate({
+                              to: ".",
+                              search: { tab: "orders", userId: c.id },
+                              params: { projectId },
+                            })
+                          }
+                        >
+                          <ShoppingCart className="h-3.5 w-3.5" />
+                        </Button>
                         <Button size="icon" variant="ghost" onClick={() => open(c)}>
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
@@ -248,7 +274,7 @@ export function CustomersManager({ projectId }: { projectId: string }) {
 
           {selected?.is_blocked && (
             <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              חסום — המשתמש לא יכול להתחבר
+              {t("blockedBanner")}
             </div>
           )}
 
@@ -260,34 +286,34 @@ export function CustomersManager({ projectId }: { projectId: string }) {
                   <span className="font-mono text-xs">{selected.id}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">אימייל</span>
+                  <span className="text-muted-foreground">{t("email")}</span>
                   <span>{selected.email || "—"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">תפקיד</span>
-                  <span>{isAdmin ? "אדמין" : "לקוח"}</span>
+                  <span className="text-muted-foreground">{t("role")}</span>
+                  <span>{isAdmin ? t("admin") : t("customerRole")}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">הזמנות</span>
-                  <span>{selected.order_count}</span>
+                  <span className="text-muted-foreground">{t("ordersCol")}</span>
+                  <span>{formatCount(selected.order_count)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">תאריך הצטרפות</span>
-                  <span>{new Date(selected.created_at).toLocaleString()}</span>
+                  <span className="text-muted-foreground">{t("joinDate")}</span>
+                  <span>{formatEcommerceDateTime(selected.created_at, lang)}</span>
                 </div>
               </Card>
 
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">שם מלא</Label>
+                  <Label className="text-xs text-muted-foreground">{t("fullName")}</Label>
                   <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">טלפון</Label>
+                  <Label className="text-xs text-muted-foreground">{t("customersPhone")}</Label>
                   <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
                 </div>
                 <Button onClick={onSave} disabled={saving} className="w-full">
-                  {saving ? "שומר…" : "שמירת שינויים"}
+                  {saving ? t("saving") : t("saveChanges")}
                 </Button>
                 <Button
                   variant="outline"
@@ -296,29 +322,29 @@ export function CustomersManager({ projectId }: { projectId: string }) {
                     setSelected(null);
                     navigate({
                       to: ".",
-                      search: { tab: "orders" },
+                      search: { tab: "orders", userId: selected.id },
                       params: { projectId },
                     });
                   }}
                 >
-                  <ShoppingCart className="ml-1 h-4 w-4" /> צפייה בהזמנות
+                  <ShoppingCart className="ml-1 h-4 w-4" /> {t("viewOrders")}
                 </Button>
               </div>
 
               {isAdmin ? (
                 <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-                  חסימה ומחיקה אינן זמינות לחשבונות אדמין.
+                  {t("blockUnavailable")}
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2 border-t pt-3">
                   <Button variant="outline" onClick={toggleBlock} className="flex-1">
                     {selected.is_blocked ? (
                       <>
-                        <CheckCircle2 className="ml-1 h-4 w-4" /> ביטול חסימה
+                        <CheckCircle2 className="ml-1 h-4 w-4" /> {t("unblock")}
                       </>
                     ) : (
                       <>
-                        <Ban className="ml-1 h-4 w-4" /> חסימת משתמש
+                        <Ban className="ml-1 h-4 w-4" /> {t("blockUser")}
                       </>
                     )}
                   </Button>
@@ -327,7 +353,7 @@ export function CustomersManager({ projectId }: { projectId: string }) {
                     onClick={() => onDelete(selected.id)}
                     className="flex-1"
                   >
-                    <Trash2 className="ml-1 h-4 w-4" /> מחיקת משתמש
+                    <Trash2 className="ml-1 h-4 w-4" /> {t("deleteUser")}
                   </Button>
                 </div>
               )}
@@ -336,7 +362,7 @@ export function CustomersManager({ projectId }: { projectId: string }) {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelected(null)}>
-              סגירה
+              {t("close")}
             </Button>
           </DialogFooter>
         </DialogContent>

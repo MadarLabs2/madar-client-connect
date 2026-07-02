@@ -133,6 +133,146 @@ export const bakeryOrdersList = createServerFn({ method: "POST" })
     return { rows: normalizedRows, error: null };
   });
 
+const ECOMMERCE_ORDER_LIST_COLUMNS =
+  "id, order_number, status, shipping_method, shipping_fee, subtotal, total, coupon_code, created_at, customer_name, customer_email, user_id";
+
+const ECOMMERCE_ORDER_DETAIL_SELECT = `
+  id,
+  order_number,
+  status,
+  shipping_method,
+  shipping_fee,
+  subtotal,
+  total,
+  coupon_code,
+  discount_percent,
+  discount_amount,
+  customer_name,
+  customer_email,
+  customer_phone,
+  customer_locale,
+  shipping_address,
+  created_at,
+  cardcom_document_number,
+  cardcom_document_type,
+  cardcom_document_url,
+  order_items (
+    id,
+    product_id,
+    product_name,
+    image_url,
+    color,
+    color_hex,
+    size,
+    quantity,
+    unit_price
+  )
+`;
+
+function sortEcommerceOrdersForDisplay<T extends { status: string; created_at: string }>(
+  rows: T[],
+): T[] {
+  const tier = (s: string) => (s === "received" ? 1 : 0);
+  return [...rows].sort((a, b) => {
+    const t = tier(a.status) - tier(b.status);
+    if (t !== 0) return t;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
+
+export const ecommerceOrdersList = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        projectId: z.string().uuid(),
+        limit: z.coerce
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .default(200)
+          .transform((limit) => Math.min(limit, 500)),
+        userId: z.string().uuid().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await isAdmin(context.userId);
+    const client = await getProjectClient(data.projectId, context.userId, admin);
+    let query = client
+      .from("orders")
+      .select(ECOMMERCE_ORDER_LIST_COLUMNS)
+      .eq("payment_status", "paid")
+      .is("hidden_from_admin_at", null)
+      .limit(data.limit)
+      .order("created_at", { ascending: false });
+    if (data.userId) query = query.eq("user_id", data.userId);
+    const { data: rows, error } = await query;
+    if (error) return { rows: [], error: error.message };
+    return {
+      rows: sortEcommerceOrdersForDisplay((rows ?? []) as Array<{ status: string; created_at: string }>),
+      error: null,
+    };
+  });
+
+export const ecommerceOrderDetails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ projectId: z.string().uuid(), orderId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await isAdmin(context.userId);
+    const client = await getProjectClient(data.projectId, context.userId, admin);
+    const { data: order, error } = await client
+      .from("orders")
+      .select(ECOMMERCE_ORDER_DETAIL_SELECT)
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (error) return { order: null, error: error.message };
+    return { order: order ?? null, error: null };
+  });
+
+export const ecommerceHideReceivedOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ projectId: z.string().uuid(), orderId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await isAdmin(context.userId);
+    const client = await getProjectClient(data.projectId, context.userId, admin);
+
+    const { data: updated, error } = await client
+      .from("orders")
+      .update({ hidden_from_admin_at: new Date().toISOString() })
+      .eq("id", data.orderId)
+      .eq("status", "received")
+      .is("hidden_from_admin_at", null)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      if (error.message.includes("hidden_from_admin_at")) {
+        const { error: rpcError } = await client.rpc("admin_hide_received_order", {
+          p_order_id: data.orderId,
+        });
+        if (rpcError) throw new Error(rpcError.message);
+        return { ok: true };
+      }
+      throw new Error(error.message);
+    }
+
+    if (!updated) {
+      const { error: rpcError } = await client.rpc("admin_hide_received_order", {
+        p_order_id: data.orderId,
+      });
+      if (!rpcError) return { ok: true };
+      throw new Error("ORDER_HIDE_FAILED");
+    }
+
+    return { ok: true };
+  });
+
 export const bakeryPendingOrdersCount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ projectId: z.string().uuid() }).parse(input))

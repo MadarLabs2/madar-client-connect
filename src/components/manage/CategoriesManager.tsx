@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { useEcommerceT } from "@/lib/ecommerce/i18n";
 
 type CategoryRow = {
   id: string;
@@ -24,6 +25,7 @@ type CategoryRow = {
 const emptyForm: CategoryRow = { id: "", name: "", name_he: "", name_ar: "" };
 
 export function CategoriesManager({ projectId }: { projectId: string }) {
+  const { t } = useEcommerceT();
   const qc = useQueryClient();
   const listFn = useServerFn(projectList);
   const insertFn = useServerFn(projectInsert);
@@ -80,7 +82,7 @@ export function CategoriesManager({ projectId }: { projectId: string }) {
   const onSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.id || !form.name || !form.name_he || !form.name_ar) {
-      toast.error("נא למלא את כל השדות");
+      toast.error(t("fillAllFields"));
       return;
     }
     const normalizedId = form.id.trim().toLowerCase().replace(/\s+/g, "-");
@@ -102,38 +104,38 @@ export function CategoriesManager({ projectId }: { projectId: string }) {
           await deleteFn({ data: { projectId, table: "categories", id: editingOriginalId } });
         }
       }
-      toast.success("נשמר");
+      toast.success(t("saved"));
       reset();
       invalidate();
     } catch (err: any) {
-      toast.error(err?.message || "שמירה נכשלה");
+      toast.error(err?.message || t("loadFailed"));
     } finally {
       setSaving(false);
     }
   };
 
   const onDelete = async (id: string) => {
-    if (!confirm("למחוק את הקטגוריה?")) return;
+    if (!confirm(t("categoriesConfirmDelete"))) return;
     try {
       await deleteFn({ data: { projectId, table: "categories", id } });
-      toast.success("נמחק");
+      toast.success(t("deleted"));
       if (editingOriginalId === id) reset();
       invalidate();
     } catch (err: any) {
-      toast.error(err?.message || "מחיקה נכשלה");
+      toast.error(err?.message || t("deleteFailed"));
     }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-3xl">קטגוריות</h1>
+        <h1 className="font-display text-3xl">{t("categoriesTitle")}</h1>
         <div className="relative">
           <Search className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="חיפוש…"
+            placeholder={t("search")}
             className="w-56 pr-7"
           />
         </div>
@@ -142,21 +144,21 @@ export function CategoriesManager({ projectId }: { projectId: string }) {
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <Card className="overflow-hidden">
           {isLoading ? (
-            <div className="p-6 text-sm text-muted-foreground">טוען…</div>
+            <div className="p-6 text-sm text-muted-foreground">{t("loading")}</div>
           ) : data?.error ? (
             <div className="p-6 text-sm">
-              <div className="font-medium">לא ניתן לטעון את הטבלה</div>
+              <div className="font-medium">{t("errorLoadTable")}</div>
               <div className="mt-1 text-muted-foreground">{data.error}</div>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">לא נמצאו קטגוריות.</div>
+            <div className="p-6 text-sm text-muted-foreground">{t("noCategories")}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/30 text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 text-right font-medium">ID</th>
-                    <th className="px-3 py-2 text-right font-medium">שמות</th>
+                    <th className="px-3 py-2 text-right font-medium">{t("namesCol")}</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
@@ -188,7 +190,7 @@ export function CategoriesManager({ projectId }: { projectId: string }) {
         <Card className="p-4">
           <h2 className="mb-4 flex items-center gap-2 font-display text-lg">
             <Plus className="h-4 w-4" />
-            {editingOriginalId ? "עריכת קטגוריה" : "הוספת קטגוריה"}
+            {editingOriginalId ? t("editCategory") : t("addCategory")}
           </h2>
           <form onSubmit={onSave} className="space-y-3">
             <div className="space-y-1">
@@ -208,7 +210,7 @@ export function CategoriesManager({ projectId }: { projectId: string }) {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">עברית</Label>
+              <Label className="text-xs text-muted-foreground">{t("langHe")}</Label>
               <Input
                 value={form.name_he}
                 onChange={(e) => setForm((p) => ({ ...p, name_he: e.target.value }))}
@@ -226,10 +228,10 @@ export function CategoriesManager({ projectId }: { projectId: string }) {
             </div>
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={saving} className="flex-1">
-                {saving ? "שומר…" : "שמירה"}
+                {saving ? t("saving") : t("save")}
               </Button>
               <Button type="button" variant="outline" onClick={reset} className="flex-1">
-                נקה
+                {t("clear")}
               </Button>
             </div>
           </form>

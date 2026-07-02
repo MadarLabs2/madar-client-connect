@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Trash2, Search, Send } from "lucide-react";
+import { formatEcommerceDateTime, type EcommerceLang, useEcommerceT } from "@/lib/ecommerce/i18n";
 
 type SubscriberRow = {
   id: string;
@@ -30,20 +31,16 @@ type SubscriberRow = {
   created_at: string;
 };
 
-function fmtDate(iso: string) {
+function fmtDate(iso: string, lang: EcommerceLang) {
   try {
-    return new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short" }).format(
-      new Date(iso)
-    );
+    return formatEcommerceDateTime(iso, lang, { dateStyle: "short", timeStyle: "short" });
   } catch {
     return iso;
   }
 }
 
-const localeLabel = (loc: string) =>
-  loc === "he" ? "עברית" : loc === "ar" ? "ערבית" : loc === "en" ? "אנגלית" : loc;
-
 export function NotificationsManager({ projectId }: { projectId: string }) {
+  const { t, lang } = useEcommerceT();
   const qc = useQueryClient();
   const listFn = useServerFn(projectList);
   const deleteFn = useServerFn(projectDelete);
@@ -90,29 +87,29 @@ export function NotificationsManager({ projectId }: { projectId: string }) {
     qc.invalidateQueries({ queryKey: ["pdb", projectId, "newsletter_subscribers"] });
 
   const onDelete = async (id: string) => {
-    if (!confirm("למחוק את הנמען?")) return;
+    if (!confirm(t("confirmDeleteRecipient"))) return;
     try {
       await deleteFn({ data: { projectId, table: "newsletter_subscribers", id } });
-      toast.success("נמחק");
+      toast.success(t("deleted"));
       invalidate();
     } catch (err: any) {
-      toast.error(err?.message || "מחיקה נכשלה");
+      toast.error(err?.message || t("deleteFailed"));
     }
   };
 
   const validate = (): boolean => {
     if (!subject.trim() || !body.trim()) {
-      toast.error("נא למלא נושא ותוכן בעברית");
+      toast.error(t("fillHebrew"));
       return false;
     }
     const needsAr = subscribers.some((s) => s.locale === "ar");
     const needsEn = subscribers.some((s) => s.locale === "en");
     if (needsAr && (!subjectAr.trim() || !bodyAr.trim())) {
-      toast.error("יש מנויים בערבית — נא למלא נושא ותוכן בערבית");
+      toast.error(t("fillArabic"));
       return false;
     }
     if (needsEn && (!subjectEn.trim() || !bodyEn.trim())) {
-      toast.error("יש מנויים באנגלית — נא למלא נושא ותוכן באנגלית");
+      toast.error(t("fillEnglish"));
       return false;
     }
     return true;
@@ -134,16 +131,14 @@ export function NotificationsManager({ projectId }: { projectId: string }) {
         },
       });
       if (res.ok) {
-        toast.success(`נשלח ל-${res.sent} נמענים`);
+        toast.success(t("sendSuccess", { count: res.sent }));
         setSubject(""); setSubjectAr(""); setSubjectEn("");
         setBody(""); setBodyAr(""); setBodyEn("");
       } else {
-        toast.error(
-          `שליחה לא הופעלה (${(res as any).queued} ממתינים). ודא שקיימת פונקציית edge בשם send-newsletter-broadcast בפרויקט.`
-        );
+        toast.error(t("sendNotEnabled", { queued: (res as any).queued }));
       }
     } catch (err: any) {
-      toast.error(err?.message || "שליחה נכשלה");
+      toast.error(err?.message || t("sendFailed"));
     } finally {
       setSending(false);
     }
@@ -154,31 +149,29 @@ export function NotificationsManager({ projectId }: { projectId: string }) {
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>אישור שליחה</AlertDialogTitle>
+            <AlertDialogTitle>{t("confirmSendTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              ההודעה תישלח ל-{subscribers.length} נמענים. להמשיך?
+              {t("confirmSendDesc", { count: subscribers.length })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>ביטול</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void onSend()}>שלח</AlertDialogAction>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void onSend()}>{t("send")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl">הודעות</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            ניהול מנויי ניוזלטר ושליחת הודעות.
-          </p>
+          <h1 className="font-display text-3xl">{t("notificationsTitle")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t("notificationsSubtitle")}</p>
         </div>
         <div className="relative">
           <Search className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="חיפוש…"
+            placeholder={t("search")}
             className="w-56 pr-7"
           />
         </div>
@@ -186,25 +179,25 @@ export function NotificationsManager({ projectId }: { projectId: string }) {
 
       <Card className="overflow-hidden">
         <div className="border-b bg-muted/30 px-4 py-2 text-xs font-medium uppercase text-muted-foreground">
-          רשימת נמענים ({subscribers.length})
+          {t("recipients", { count: subscribers.length })}
         </div>
         {isLoading ? (
-          <div className="p-6 text-sm text-muted-foreground">טוען…</div>
+          <div className="p-6 text-sm text-muted-foreground">{t("loading")}</div>
         ) : data?.error ? (
           <div className="p-6 text-sm">
-            <div className="font-medium">לא ניתן לטעון את הטבלה</div>
+            <div className="font-medium">{t("errorLoadTable")}</div>
             <div className="mt-1 text-muted-foreground">{data.error}</div>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-6 text-sm text-muted-foreground">אין נמענים עדיין.</div>
+          <div className="p-6 text-sm text-muted-foreground">{t("noRecipients")}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/20 text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 text-right font-medium">אימייל</th>
-                  <th className="px-3 py-2 text-right font-medium">שפה</th>
-                  <th className="px-3 py-2 text-right font-medium">תאריך</th>
+                  <th className="px-3 py-2 text-right font-medium">{t("notificationsEmail")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t("language")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t("date")}</th>
                   <th className="px-3 py-2"></th>
                 </tr>
               </thead>
@@ -214,9 +207,9 @@ export function NotificationsManager({ projectId }: { projectId: string }) {
                     <td className="px-3 py-2 text-right font-mono text-xs" dir="ltr">
                       {s.email}
                     </td>
-                    <td className="px-3 py-2 text-right">{localeLabel(s.locale)}</td>
+                    <td className="px-3 py-2 text-right">{t(`locale.${s.locale}`)}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">
-                      {fmtDate(s.created_at)}
+                      {fmtDate(s.created_at, lang)}
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex justify-end">
@@ -235,28 +228,26 @@ export function NotificationsManager({ projectId }: { projectId: string }) {
 
       <Card className="p-5">
         <div className="mb-4">
-          <h2 className="font-display text-xl">חיבור הודעה חדשה</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            מלא את הנושא והתוכן בעברית. אם יש מנויים בערבית/אנגלית, מלא גם בשפות אלו.
-          </p>
+          <h2 className="font-display text-xl">{t("newMessage")}</h2>
+          <p className="mt-1 text-xs text-muted-foreground">{t("newMessageHint")}</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              נושא (עברית)
+              {t("subjectHe")}
             </label>
             <Input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={200} dir="rtl" />
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              نوع الموضوع (ערבית)
+              {t("subjectAr")}
             </label>
             <Input value={subjectAr} onChange={(e) => setSubjectAr(e.target.value)} maxLength={200} dir="rtl" />
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Subject (אנגלית)
+              {t("subjectEn")}
             </label>
             <Input value={subjectEn} onChange={(e) => setSubjectEn(e.target.value)} maxLength={200} dir="ltr" />
           </div>
@@ -265,7 +256,7 @@ export function NotificationsManager({ projectId }: { projectId: string }) {
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              תוכן (עברית)
+              {t("bodyHe")}
             </label>
             <Textarea
               value={body}
@@ -278,7 +269,7 @@ export function NotificationsManager({ projectId }: { projectId: string }) {
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              المحتوى (ערבית)
+              {t("bodyAr")}
             </label>
             <Textarea
               value={bodyAr}
@@ -291,7 +282,7 @@ export function NotificationsManager({ projectId }: { projectId: string }) {
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Body (אנגלית)
+              {t("bodyEn")}
             </label>
             <Textarea
               value={bodyEn}
@@ -313,7 +304,7 @@ export function NotificationsManager({ projectId }: { projectId: string }) {
             }}
           >
             <Send className="mr-1.5 h-3.5 w-3.5" />
-            {sending ? "שולח…" : `שלח ל-${subscribers.length} נמענים`}
+            {sending ? t("sending") : t("sendToN", { n: subscribers.length })}
           </Button>
         </div>
       </Card>

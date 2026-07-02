@@ -26,26 +26,18 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
-import { projectList } from "@/lib/project-db.functions";
+import { projectList, ecommerceOrdersList } from "@/lib/project-db.functions";
+import { ECOMMERCE_ORDER_STATUSES } from "@/lib/ecommerce/orders";
 import { cn } from "@/lib/utils";
+import { useEcommerceTheme } from "@/lib/ecommerce/EcommerceThemeContext";
+import { formatEcommerceDateTime, formatEcommerceMoney, formatEcommerceNumber, useEcommerceOrderLabels, useEcommerceT } from "@/lib/ecommerce/i18n";
 
 type RangePreset = "7" | "30" | "90" | "month" | "custom";
 
-const ORDER_STATUSES = ["received", "processing", "shipped", "delivered", "cancelled"] as const;
-const STATUS_LABELS: Record<string, string> = {
-  received: "התקבלה",
-  processing: "בטיפול",
-  shipped: "נשלחה",
-  delivered: "נמסרה",
-  cancelled: "בוטלה",
-};
-const STATUS_COLORS = [
-  "hsl(0, 0%, 20%)",
-  "hsl(36, 45%, 55%)",
-  "hsl(200, 15%, 45%)",
-  "hsl(140, 12%, 40%)",
-  "hsl(0, 70%, 50%)",
-];
+const ORDER_STATUSES = ECOMMERCE_ORDER_STATUSES;
+function statusColors(accent: string) {
+  return [accent, "hsl(36, 45%, 55%)", "hsl(200, 15%, 45%)", "hsl(140, 12%, 40%)", "hsl(0, 70%, 50%)"];
+}
 
 function parseDateInput(value: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -86,11 +78,17 @@ function download(filename: string, body: string) {
 }
 
 export function ReportsManager({ projectId }: { projectId: string }) {
+  const { t, lang } = useEcommerceT();
+  const { statusLabel } = useEcommerceOrderLabels();
+  const { preset: accentPreset } = useEcommerceTheme();
+  const accent = accentPreset.swatch;
+  const chartColors = statusColors(accent);
   const listFn = useServerFn(projectList);
+  const ordersListFn = useServerFn(ecommerceOrdersList);
 
   const { data: ordersRes, isLoading: ordersLoading, error: ordersError } = useQuery({
-    queryKey: ["pdb", projectId, "orders"],
-    queryFn: () => listFn({ data: { projectId, table: "orders", limit: 500 } }),
+    queryKey: ["ecommerce", projectId, "orders", "all"],
+    queryFn: () => ordersListFn({ data: { projectId, limit: 500 } }),
   });
   const { data: productsRes, isLoading: productsLoading } = useQuery({
     queryKey: ["pdb", projectId, "products"],
@@ -161,10 +159,10 @@ export function ReportsManager({ projectId }: { projectId: string }) {
     for (const o of inRange) map.set(o.status, (map.get(o.status) ?? 0) + 1);
     return ORDER_STATUSES.map((s) => ({
       status: s,
-      name: STATUS_LABELS[s] ?? s,
+      name: statusLabel(s),
       value: map.get(s) ?? 0,
     })).filter((x) => x.value > 0);
-  }, [inRange]);
+  }, [inRange, statusLabel]);
 
   const topCustomers = useMemo(() => {
     const agg = new Map<string, { name: string; email: string; revenue: number; orders: number }>();
@@ -184,13 +182,18 @@ export function ReportsManager({ projectId }: { projectId: string }) {
   }, [nonCancelled]);
 
   const money = useMemo(
-    () => new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }),
-    []
+    () => (n: number) => formatEcommerceMoney(n, lang, { maximumFractionDigits: 0 }),
+    [lang],
   );
   const moneyDetailed = useMemo(
-    () => new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-    []
+    () => (n: number) =>
+      formatEcommerceMoney(n, lang, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    [lang],
   );
+  const formatCount = (n: number) => formatEcommerceNumber(n, lang);
 
   const periodLabel = `${format(start, "d MMM yyyy")} — ${format(end, "d MMM yyyy")}`;
 
@@ -198,22 +201,22 @@ export function ReportsManager({ projectId }: { projectId: string }) {
     try {
       const sections: { title: string; rows: string[][] }[] = [
         {
-          title: "סיכום",
+          title: t("csv.summary"),
           rows: [
-            ["טווח", `${format(start, "yyyy-MM-dd")} – ${format(end, "yyyy-MM-dd")}`],
-            ["הזמנות בטווח", String(inRange.length)],
-            ["הכנסות", moneyDetailed.format(metrics.revenue)],
-            ["הזמנות (לא מבוטלות)", String(metrics.count)],
-            ["AOV", metrics.count ? moneyDetailed.format(metrics.aov) : "—"],
-            ["בוטלו", String(metrics.cancelled)],
-            ["סכום ביניים", moneyDetailed.format(metrics.subtotal)],
-            ["משלוחים", moneyDetailed.format(metrics.shipping)],
-            ["לקוחות חדשים", String(newCustomers)],
-            ["מוצרים", String(products.length)],
+            [t("csv.range"), `${format(start, "yyyy-MM-dd")} – ${format(end, "yyyy-MM-dd")}`],
+            [t("csv.ordersInRange"), formatCount(inRange.length)],
+            [t("csv.revenue"), moneyDetailed(metrics.revenue)],
+            [t("csv.ordersNonCancelled"), formatCount(metrics.count)],
+            [t("csv.aov"), metrics.count ? moneyDetailed(metrics.aov) : "—"],
+            [t("csv.cancelled"), formatCount(metrics.cancelled)],
+            [t("csv.subtotal"), moneyDetailed(metrics.subtotal)],
+            [t("csv.shipping"), moneyDetailed(metrics.shipping)],
+            [t("csv.newCustomers"), formatCount(newCustomers)],
+            [t("csv.products"), formatCount(products.length)],
           ],
         },
         {
-          title: "הזמנות",
+          title: t("csv.ordersSection"),
           rows: [
             ["id", "order_number", "status", "created_at", "subtotal", "shipping_fee", "total", "customer_name", "customer_email"],
             ...inRange.map((o) => [
@@ -230,27 +233,27 @@ export function ReportsManager({ projectId }: { projectId: string }) {
           ],
         },
         {
-          title: "לקוחות מובילים",
+          title: t("csv.topCustomersSection"),
           rows: [
             ["name", "email", "orders", "revenue"],
-            ...topCustomers.map((r) => [r.name, r.email, String(r.orders), moneyDetailed.format(r.revenue)]),
+            ...topCustomers.map((r) => [r.name, r.email, formatCount(r.orders), moneyDetailed(r.revenue)]),
           ],
         },
       ];
       const parts = sections.map((s) => `${s.title}\r\n${rowsToCsv(s.rows)}`).join("\r\n\r\n");
       download(`sales-report_${format(start, "yyyy-MM-dd")}_${format(end, "yyyy-MM-dd")}.csv`, parts);
-      toast.success("הדוח הורד");
+      toast.success(t("downloadSuccess"));
     } catch (e: any) {
-      toast.error(e.message || "שגיאה בהורדה");
+      toast.error(e.message || t("downloadError"));
     }
-  }, [inRange, metrics, moneyDetailed, newCustomers, products.length, start, end, topCustomers]);
+  }, [inRange, metrics, moneyDetailed, newCustomers, products.length, start, end, topCustomers, t]);
 
-  const presets: { id: RangePreset; label: string }[] = [
-    { id: "7", label: "7 ימים" },
-    { id: "30", label: "30 ימים" },
-    { id: "90", label: "90 ימים" },
-    { id: "month", label: "החודש" },
-    { id: "custom", label: "מותאם" },
+  const presets: { id: RangePreset; labelKey: string }[] = [
+    { id: "7", labelKey: "preset.7" },
+    { id: "30", labelKey: "preset.30" },
+    { id: "90", labelKey: "preset.90" },
+    { id: "month", labelKey: "preset.month" },
+    { id: "custom", labelKey: "preset.custom" },
   ];
 
   const loading = ordersLoading || productsLoading || customersLoading;
@@ -259,20 +262,22 @@ export function ReportsManager({ projectId }: { projectId: string }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl">דוחות</h1>
-          <p className="text-sm text-muted-foreground">סקירת מכירות, סטטוסים ולקוחות</p>
+          <h1 className="font-display text-3xl">{t("reportsTitle")}</h1>
+          <p className="text-sm text-muted-foreground">{t("reportsSubtitle")}</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted-foreground">{periodLabel}</span>
           <Button onClick={handleDownload} variant="outline">
             <Download className="ml-1.5 h-4 w-4" />
-            הורד CSV
+            {t("downloadCsv")}
           </Button>
         </div>
       </div>
 
       <Card className="p-4">
-        <div className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">טווח תאריכים</div>
+        <div className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {t("dateRange")}
+        </div>
         <div className="flex flex-wrap gap-2">
           {presets.map((p) => (
             <button
@@ -281,18 +286,18 @@ export function ReportsManager({ projectId }: { projectId: string }) {
               className={cn(
                 "rounded-md border px-3 py-1.5 text-xs transition-colors",
                 preset === p.id
-                  ? "border-foreground bg-foreground text-background"
+                  ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-transparent text-foreground hover:bg-muted"
               )}
             >
-              {p.label}
+              {t(p.labelKey)}
             </button>
           ))}
         </div>
         {preset === "custom" && (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-xs">
-              מתאריך
+              {t("fromDate")}
               <input
                 type="date"
                 value={from}
@@ -301,7 +306,7 @@ export function ReportsManager({ projectId }: { projectId: string }) {
               />
             </label>
             <label className="flex items-center gap-2 text-xs">
-              עד
+              {t("toDate")}
               <input
                 type="date"
                 value={to}
@@ -314,33 +319,33 @@ export function ReportsManager({ projectId }: { projectId: string }) {
       </Card>
 
       {ordersError ? (
-        <Card className="p-4 text-sm text-destructive">שגיאה בטעינת הזמנות</Card>
+        <Card className="p-4 text-sm text-destructive">{t("loadOrdersError")}</Card>
       ) : loading ? (
-        <Card className="p-6 text-sm text-muted-foreground">טוען…</Card>
+        <Card className="p-6 text-sm text-muted-foreground">{t("loading")}</Card>
       ) : (
         <>
           <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
-            <Kpi label="הכנסות" value={money.format(metrics.revenue)} />
-            <Kpi label="הזמנות" value={String(metrics.count)} />
-            <Kpi label="AOV" value={metrics.count ? money.format(metrics.aov) : "—"} />
-            <Kpi label="בוטלו" value={String(metrics.cancelled)} />
-            <Kpi label="לקוחות חדשים" value={String(newCustomers)} />
-            <Kpi label="מוצרים" value={String(products.length)} />
+            <Kpi label={t("revenue")} value={money(metrics.revenue)} />
+            <Kpi label={t("ordersKpi")} value={formatCount(metrics.count)} />
+            <Kpi label={t("aov")} value={metrics.count ? money(metrics.aov) : "—"} />
+            <Kpi label={t("cancelled")} value={formatCount(metrics.cancelled)} />
+            <Kpi label={t("newCustomers")} value={formatCount(newCustomers)} />
+            <Kpi label={t("reportsProducts")} value={formatCount(products.length)} />
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <Kpi label="סכום ביניים" value={moneyDetailed.format(metrics.subtotal)} />
-            <Kpi label="משלוחים" value={moneyDetailed.format(metrics.shipping)} />
+            <Kpi label={t("reportsSubtotal")} value={moneyDetailed(metrics.subtotal)} />
+            <Kpi label={t("reportsShipping")} value={moneyDetailed(metrics.shipping)} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card className="p-4">
               <div className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                הכנסות לפי יום
+                {t("revenueByDay")}
               </div>
               {revenueByDay.every((d) => d.revenue === 0) ? (
                 <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">
-                  אין נתונים בטווח זה
+                  {t("noDataInRange")}
                 </div>
               ) : (
                 <div className="h-[260px]">
@@ -348,19 +353,19 @@ export function ReportsManager({ projectId }: { projectId: string }) {
                     <AreaChart data={revenueByDay}>
                       <defs>
                         <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(36, 45%, 55%)" stopOpacity={0.5} />
-                          <stop offset="100%" stopColor="hsl(36, 45%, 55%)" stopOpacity={0} />
+                          <stop offset="0%" stopColor={accent} stopOpacity={0.45} />
+                          <stop offset="100%" stopColor={accent} stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,90%)" />
                       <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                      <YAxis tickFormatter={(v) => money.format(Number(v))} tick={{ fontSize: 11 }} width={64} />
+                      <YAxis tickFormatter={(v) => money(Number(v))} tick={{ fontSize: 11 }} width={64} />
                       <Tooltip
-                        formatter={(value: any) => [moneyDetailed.format(Number(value)), "הכנסות"]}
+                        formatter={(value: any) => [moneyDetailed(Number(value)), t("revenue")]}
                         labelFormatter={(_, payload: any) => payload?.[0]?.payload?.key ?? ""}
                         contentStyle={{ borderRadius: 6, border: "1px solid hsl(0,0%,90%)", fontSize: 12 }}
                       />
-                      <Area type="monotone" dataKey="revenue" stroke="hsl(36, 45%, 45%)" fill="url(#revFill)" />
+                      <Area type="monotone" dataKey="revenue" stroke={accent} fill="url(#revFill)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -369,11 +374,11 @@ export function ReportsManager({ projectId }: { projectId: string }) {
 
             <Card className="p-4">
               <div className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                התפלגות סטטוסים
+                {t("statusDistribution")}
               </div>
               {statusMix.length === 0 ? (
                 <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">
-                  אין נתונים בטווח זה
+                  {t("noDataInRange")}
                 </div>
               ) : (
                 <>
@@ -382,7 +387,7 @@ export function ReportsManager({ projectId }: { projectId: string }) {
                       <PieChart>
                         <Pie data={statusMix} dataKey="value" nameKey="name" innerRadius={48} outerRadius={80} paddingAngle={2}>
                           {statusMix.map((_, i) => (
-                            <Cell key={i} fill={STATUS_COLORS[i % STATUS_COLORS.length]} />
+                            <Cell key={i} fill={chartColors[i % chartColors.length]} />
                           ))}
                         </Pie>
                         <Tooltip
@@ -397,7 +402,7 @@ export function ReportsManager({ projectId }: { projectId: string }) {
                       <div key={s.status} className="flex items-center gap-1.5">
                         <span
                           className="inline-block h-2.5 w-2.5 rounded-sm"
-                          style={{ background: STATUS_COLORS[i % STATUS_COLORS.length] }}
+                          style={{ background: chartColors[i % chartColors.length] }}
                         />
                         <span>{s.name}</span>
                         <span className="text-muted-foreground">({s.value})</span>
@@ -411,19 +416,19 @@ export function ReportsManager({ projectId }: { projectId: string }) {
 
           <Card className="p-4">
             <div className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              לקוחות מובילים
+              {t("topCustomers")}
             </div>
             {topCustomers.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">אין נתונים</div>
+              <div className="py-8 text-center text-sm text-muted-foreground">{t("noData")}</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="border-b text-xs uppercase text-muted-foreground">
                     <tr>
-                      <th className="px-3 py-2 text-right font-medium">לקוח</th>
-                      <th className="px-3 py-2 text-right font-medium">אימייל</th>
-                      <th className="px-3 py-2 text-right font-medium">הזמנות</th>
-                      <th className="px-3 py-2 text-right font-medium">הכנסות</th>
+                      <th className="px-3 py-2 text-right font-medium">{t("reportsCustomer")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t("reportsEmail")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t("reportsOrders")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t("reportsRevenue")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -431,8 +436,8 @@ export function ReportsManager({ projectId }: { projectId: string }) {
                       <tr key={i} className="border-b last:border-0">
                         <td className="px-3 py-2 text-right">{r.name || "—"}</td>
                         <td className="px-3 py-2 text-right">{r.email || "—"}</td>
-                        <td className="px-3 py-2 text-right">{r.orders}</td>
-                        <td className="px-3 py-2 text-right">{moneyDetailed.format(r.revenue)}</td>
+                        <td className="px-3 py-2 text-right">{formatCount(r.orders)}</td>
+                        <td className="px-3 py-2 text-right">{moneyDetailed(r.revenue)}</td>
                       </tr>
                     ))}
                   </tbody>
