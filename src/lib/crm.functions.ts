@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/external-db/auth-middleware";
 import { supabaseAdmin as extAdmin } from "@/integrations/external-db/client.server";
 import { supabaseAdmin as cloudAdmin } from "@/integrations/supabase/client.server";
+import { crmDatetimeLocalToIso, getJerusalemTodayRangeUtc } from "@/lib/crm-datetime";
 
 async function assertAdmin(userId: string) {
   const { data, error } = await extAdmin
@@ -131,15 +132,22 @@ export const upsertActivity = createServerFn({ method: "POST" })
   .inputValidator((i) => UpsertActivitySchema.parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const payload = {
+    const payload: Record<string, unknown> = {
       lead_id: data.lead_id,
       type: data.type,
       title: data.title,
       description: data.description || null,
-      due_date: data.due_date || null,
-      completed: data.completed ?? false,
-      completed_at: data.completed ? new Date().toISOString() : null,
+      due_date: crmDatetimeLocalToIso(data.due_date ?? null),
     };
+    if (data.id) {
+      if (data.completed !== undefined) {
+        payload.completed = data.completed;
+        payload.completed_at = data.completed ? new Date().toISOString() : null;
+      }
+    } else {
+      payload.completed = data.completed ?? false;
+      payload.completed_at = data.completed ? new Date().toISOString() : null;
+    }
     if (data.id) {
       const { error } = await cloudAdmin.from("lead_activities").update(payload).eq("id", data.id);
       if (error) throw new Error(error.message);
@@ -266,10 +274,7 @@ export const getCrmOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const { endIso: todayEndIso } = getJerusalemTodayRangeUtc();
 
     const [leadsR, paidR, openInvR, todayActR, recentActR, recentCommR] = await Promise.all([
       cloudAdmin.from("leads").select("id,name,company,stage,value,currency,created_at").order("created_at", { ascending: false }),
@@ -279,7 +284,7 @@ export const getCrmOverview = createServerFn({ method: "GET" })
         .from("lead_activities")
         .select("id,lead_id,type,title,due_date,completed")
         .eq("completed", false)
-        .lt("due_date", tomorrow.toISOString())
+        .lt("due_date", todayEndIso)
         .order("due_date", { ascending: true }),
       cloudAdmin.from("lead_activities").select("id,lead_id,type,title,created_at,completed").order("created_at", { ascending: false }).limit(8),
       cloudAdmin.from("lead_communications").select("id,lead_id,channel,direction,content,occurred_at").order("occurred_at", { ascending: false }).limit(8),

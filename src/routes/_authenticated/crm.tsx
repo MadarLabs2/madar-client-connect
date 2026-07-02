@@ -19,6 +19,11 @@ import {
   deleteInvoice,
   getCrmOverview,
 } from "@/lib/crm.functions";
+import {
+  crmDatetimeLocalToIso,
+  crmIsoToDatetimeLocal,
+  formatCrmDateTime,
+} from "@/lib/crm-datetime";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,7 +60,7 @@ import {
   Circle,
   TrendingUp,
   Users,
-  DollarSign,
+  Banknote,
   AlertCircle,
   ArrowLeft,
   Building2,
@@ -265,7 +270,7 @@ function CrmPage() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <MetricCard icon={<Users className="h-4 w-4" />} label="סה״כ לידים" value={String(metrics.totalLeads)} />
         <MetricCard icon={<TrendingUp className="h-4 w-4" />} label="ערך פתוח" value={fmt(metrics.openValue)} />
-        <MetricCard icon={<DollarSign className="h-4 w-4" />} label="הכנסות שולמו" value={fmt(metrics.paidTotal)} />
+        <MetricCard icon={<Banknote className="h-4 w-4" />} label="הכנסות שולמו" value={fmt(metrics.paidTotal)} />
         <MetricCard icon={<AlertCircle className="h-4 w-4" />} label="חוב פתוח" value={fmt(metrics.openInvTotal)} />
         <MetricCard icon={<CheckCircle2 className="h-4 w-4" />} label="אחוז סגירה" value={`${metrics.winRate}%`} />
       </div>
@@ -292,7 +297,7 @@ function CrmPage() {
                         <span className="text-sm font-medium">{t.title}</span>
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        {lead?.name ?? "—"}{t.due_date ? ` · ${new Date(t.due_date).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" })}` : ""}
+                        {lead?.name ?? "—"}{t.due_date ? ` · ${formatCrmDateTime(t.due_date)}` : ""}
                       </div>
                     </button>
                   );
@@ -555,6 +560,7 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
   });
 
   const [actForm, setActForm] = useState({ type: "task" as ActivityType, title: "", description: "", due_date: "" });
+  const [editingActId, setEditingActId] = useState<string | null>(null);
   const [commForm, setCommForm] = useState({ channel: "phone" as CommChannel, direction: "out" as "in" | "out", content: "" });
   const [invForm, setInvForm] = useState({ number: "", amount: 0, currency: "ILS", status: "draft" as InvoiceStatus, due_date: "" });
 
@@ -566,13 +572,45 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
     qc.invalidateQueries({ queryKey: ["crm-overview"] });
   }
 
+  function resetActForm() {
+    setActForm({ type: "task", title: "", description: "", due_date: "" });
+    setEditingActId(null);
+  }
+
+  function startEditActivity(a: {
+    id: string;
+    type: string;
+    title: string;
+    description: string | null;
+    due_date: string | null;
+  }) {
+    setEditingActId(a.id);
+    setActForm({
+      type: a.type as ActivityType,
+      title: a.title,
+      description: a.description ?? "",
+      due_date: crmIsoToDatetimeLocal(a.due_date),
+    });
+  }
+
   async function handleAddActivity(e: React.FormEvent) {
     e.preventDefault();
     if (!actForm.title.trim()) return;
     try {
-      await saveAct({ data: { lead_id: leadId, ...actForm, due_date: actForm.due_date || null } });
-      setActForm({ type: "task", title: "", description: "", due_date: "" });
+      const wasEditing = Boolean(editingActId);
+      await saveAct({
+        data: {
+          id: editingActId ?? undefined,
+          lead_id: leadId,
+          type: actForm.type,
+          title: actForm.title,
+          description: actForm.description,
+          due_date: crmDatetimeLocalToIso(actForm.due_date),
+        },
+      });
+      resetActForm();
       invalidate();
+      toast.success(wasEditing ? "המשימה עודכנה" : "המשימה נוספה");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "שגיאה");
     }
@@ -672,6 +710,9 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
 
               <TabsContent value="activities" className="space-y-3 pt-3">
                 <form onSubmit={handleAddActivity} className="space-y-2 rounded-md border p-3 bg-muted/20">
+                  {editingActId && (
+                    <p className="text-xs font-medium text-primary">עריכת משימה</p>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={actForm.type} onValueChange={(v) => setActForm({ ...actForm, type: v as ActivityType })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -681,11 +722,25 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
                         ))}
                       </SelectContent>
                     </Select>
-                    <Input type="datetime-local" value={actForm.due_date} onChange={(e) => setActForm({ ...actForm, due_date: e.target.value })} />
+                    <Input
+                      type="datetime-local"
+                      value={actForm.due_date}
+                      onChange={(e) => setActForm({ ...actForm, due_date: e.target.value })}
+                    />
                   </div>
                   <Input placeholder="כותרת המשימה" value={actForm.title} onChange={(e) => setActForm({ ...actForm, title: e.target.value })} />
                   <Textarea rows={2} placeholder="תיאור (אופציונלי)" value={actForm.description} onChange={(e) => setActForm({ ...actForm, description: e.target.value })} />
-                  <Button type="submit" size="sm"><Plus className="ml-1 h-3.5 w-3.5" />הוסף</Button>
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm">
+                      {editingActId ? <Pencil className="ml-1 h-3.5 w-3.5" /> : <Plus className="ml-1 h-3.5 w-3.5" />}
+                      {editingActId ? "עדכן" : "הוסף"}
+                    </Button>
+                    {editingActId && (
+                      <Button type="button" size="sm" variant="outline" onClick={resetActForm}>
+                        ביטול
+                      </Button>
+                    )}
+                  </div>
                 </form>
                 <div className="space-y-2">
                   {data?.activities.map((a) => (
@@ -701,10 +756,13 @@ function LeadDetailDialog({ leadId, onClose, onEdit, onDelete }: LeadDetailProps
                         {a.description && <p className="mt-0.5 text-xs text-muted-foreground">{a.description}</p>}
                         {a.due_date && (
                           <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                            <Calendar className="h-3 w-3" />{new Date(a.due_date).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" })}
+                            <Calendar className="h-3 w-3" />{formatCrmDateTime(a.due_date)}
                           </div>
                         )}
                       </div>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditActivity(a)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteAct(a.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
