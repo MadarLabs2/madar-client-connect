@@ -19,10 +19,6 @@ import {
   useEcommerceT,
 } from "@/lib/ecommerce/i18n";
 import { useEcommerceOrdersSync } from "@/lib/ecommerce/useEcommerceOrdersSync";
-import {
-  playNewOrderChime,
-  unlockOrderNotificationAudio,
-} from "@/lib/bakery/orderNotificationSound";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -155,16 +151,6 @@ export function OrdersManager({
     formatEcommerceMoney(n, lang, { maximumFractionDigits: 0 });
   const formatCount = (n: number) => formatEcommerceNumber(n, lang);
 
-  useEffect(() => {
-    const unlock = () => unlockOrderNotificationAudio();
-    window.addEventListener("pointerdown", unlock);
-    window.addEventListener("keydown", unlock);
-    return () => {
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
-    };
-  }, []);
-
   const invalidateOrders = useCallback(() => {
     qc.invalidateQueries({ queryKey: ["ecommerce", projectId, "orders"] });
   }, [qc, projectId]);
@@ -226,9 +212,9 @@ export function OrdersManager({
       ordersInitializedRef.current = true;
       return;
     }
+    // The chime itself is played globally by EcommercePendingOrdersProvider.
     const brandNew = orders.filter((o) => !knownOrderIdsRef.current.has(o.id));
     if (brandNew.length > 0) {
-      playNewOrderChime();
       setUnseenOrderIds((prev) => {
         const next = new Set(prev);
         for (const o of brandNew) next.add(o.id);

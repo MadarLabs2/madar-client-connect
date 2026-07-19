@@ -273,6 +273,21 @@ export const ecommerceHideReceivedOrder = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const ecommerceOrdersCount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ projectId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const admin = await isAdmin(context.userId);
+    const client = await getProjectClient(data.projectId, context.userId, admin);
+    const { count, error } = await client
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("payment_status", "paid")
+      .is("hidden_from_admin_at", null);
+    if (error) return { count: 0, error: error.message };
+    return { count: count ?? 0, error: null };
+  });
+
 export const bakeryPendingOrdersCount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ projectId: z.string().uuid() }).parse(input))

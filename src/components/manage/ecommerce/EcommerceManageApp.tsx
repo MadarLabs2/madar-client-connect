@@ -9,6 +9,7 @@ import { ReportsManager } from "@/components/manage/ReportsManager";
 import { CouponsManager } from "@/components/manage/CouponsManager";
 import { NotificationsManager } from "@/components/manage/NotificationsManager";
 import { EcommerceSettingsPage } from "@/components/manage/ecommerce/EcommerceSettingsPage";
+import { EcommercePendingOrdersProvider } from "@/components/manage/ecommerce/EcommercePendingOrdersContext";
 import { EcommerceThemeProvider } from "@/lib/ecommerce/EcommerceThemeContext";
 import { EcommerceI18nProvider, useEcommerceT } from "@/lib/ecommerce/i18n";
 
@@ -95,14 +96,16 @@ export function EcommerceManageApp({
   return (
     <EcommerceI18nProvider projectId={projectId}>
       <EcommerceThemeProvider projectId={projectId}>
-        <EcommerceShell
-          projectName={projectName}
-          liveUrl={liveUrl}
-          activeTab={activeTab}
-          onTabChange={onTabChange}
-        >
-          {renderTab()}
-        </EcommerceShell>
+        <EcommercePendingOrdersProvider projectId={projectId}>
+          <EcommerceShell
+            projectName={projectName}
+            liveUrl={liveUrl}
+            activeTab={activeTab}
+            onTabChange={onTabChange}
+          >
+            {renderTab()}
+          </EcommerceShell>
+        </EcommercePendingOrdersProvider>
       </EcommerceThemeProvider>
     </EcommerceI18nProvider>
   );
