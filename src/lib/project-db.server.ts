@@ -13,7 +13,18 @@ function pickSecrets(raw: ProjectSecrets | ProjectSecrets[] | null | undefined) 
   return Array.isArray(raw) ? raw[0] : raw;
 }
 
-export async function getProjectClient(projectId: string, userId: string, isAdmin: boolean) {
+export type ProjectSupabaseSecrets = {
+  url: string;
+  serviceKey: string | null;
+  anonKey: string | null;
+};
+
+/** Loads project Supabase credentials after verifying the caller may access the project. */
+export async function getProjectSupabaseSecrets(
+  projectId: string,
+  userId: string,
+  isAdmin: boolean,
+): Promise<ProjectSupabaseSecrets> {
   const { data: project, error } = await supabaseAdmin
     .from("projects")
     .select("id,client_id, project_secrets(supabase_url,supabase_service_key,supabase_anon_key)")
@@ -24,8 +35,18 @@ export async function getProjectClient(projectId: string, userId: string, isAdmi
   if (!isAdmin && project.client_id !== userId) throw new Error("Forbidden");
   const secrets = pickSecrets(project.project_secrets as ProjectSecrets | ProjectSecrets[] | null);
   const url = secrets?.supabase_url;
-  const key = secrets?.supabase_service_key || secrets?.supabase_anon_key;
-  if (!url || !key) throw new Error("Project has no Supabase credentials configured");
+  if (!url) throw new Error("Project has no Supabase credentials configured");
+  return {
+    url,
+    serviceKey: secrets?.supabase_service_key ?? null,
+    anonKey: secrets?.supabase_anon_key ?? null,
+  };
+}
+
+export async function getProjectClient(projectId: string, userId: string, isAdmin: boolean) {
+  const { url, serviceKey, anonKey } = await getProjectSupabaseSecrets(projectId, userId, isAdmin);
+  const key = serviceKey || anonKey;
+  if (!key) throw new Error("Project has no Supabase credentials configured");
   const cacheKey = `${url}:${key}`;
   let client = cache.get(cacheKey);
   if (!client) {
