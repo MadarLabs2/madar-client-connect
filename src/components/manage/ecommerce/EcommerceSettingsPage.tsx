@@ -94,32 +94,42 @@ export function EcommerceSettingsPage({ projectId }: { projectId: string }) {
     if (!validate()) return;
     setSaving(true);
     try {
-      const row = {
+      const baseRow = {
         contact_phone_display: form.contact_phone_display.trim(),
         shipping_home_flat_nis: Number(form.shipping_home_flat_nis),
         shipping_free_above_subtotal_nis: Number(form.shipping_free_above_subtotal_nis),
-        admin_accent_preset: form.admin_accent_preset,
       };
-      if (current?.id != null) {
-        await updateFn({
-          data: { projectId, table: "site_settings", id: current.id, row },
-        });
-      } else {
-        await insertFn({ data: { projectId, table: "site_settings", row } });
+
+      const save = async (row: Record<string, unknown>) => {
+        if (current?.id != null) {
+          await updateFn({
+            data: { projectId, table: "site_settings", id: current.id, row },
+          });
+        } else {
+          await insertFn({ data: { projectId, table: "site_settings", row } });
+        }
+      };
+
+      // If the project's DB doesn't have the admin_accent_preset column,
+      // retry without it so phone/shipping still persist.
+      let accentSavedToDb = true;
+      try {
+        await save({ ...baseRow, admin_accent_preset: form.admin_accent_preset });
+      } catch (err: any) {
+        const msg = String(err?.message ?? "");
+        if (!msg.includes("admin_accent_preset")) throw err;
+        accentSavedToDb = false;
+        await save(baseRow);
       }
+
       persistAccentLocal(projectId, form.admin_accent_preset);
-      toast.success(t("settingsSaved"));
+      toast.success(accentSavedToDb ? t("settingsSaved") : t("accentSavedLocal"));
       qc.invalidateQueries({ queryKey: ["pdb", projectId, "site_settings"] });
       qc.invalidateQueries({ queryKey: ["ecommerce", projectId, "theme"] });
     } catch (err: any) {
       persistAccentLocal(projectId, form.admin_accent_preset);
       qc.invalidateQueries({ queryKey: ["ecommerce", projectId, "theme"] });
-      const msg = String(err?.message ?? "");
-      if (msg.includes("admin_accent_preset")) {
-        toast.success(t("accentSavedLocal"));
-      } else {
-        toast.error(err?.message || t("loadFailed"));
-      }
+      toast.error(err?.message || t("loadFailed"));
     } finally {
       setSaving(false);
     }
