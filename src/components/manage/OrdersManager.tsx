@@ -348,6 +348,26 @@ export function OrdersManager({
     return out;
   }, [order?.shipping_address, t]);
 
+  const shippingZoneInfo = useMemo(() => {
+    const a = order?.shipping_address;
+    if (!a || typeof a !== "object" || Array.isArray(a)) return null;
+    const raw = a as Record<string, unknown>;
+    const name =
+      typeof raw.shipping_zone_name === "string" ? raw.shipping_zone_name.trim() : "";
+    const priceRaw = raw.shipping_zone_price;
+    const price =
+      typeof priceRaw === "number"
+        ? priceRaw
+        : typeof priceRaw === "string" && priceRaw.trim()
+          ? Number(priceRaw)
+          : null;
+    if (!name && !(price != null && Number.isFinite(price))) return null;
+    return {
+      name: name || null,
+      price: price != null && Number.isFinite(price) ? price : null,
+    };
+  }, [order?.shipping_address]);
+
   const hasInvoice =
     Boolean(order?.cardcom_document_number?.trim()) ||
     Boolean(order?.cardcom_document_type?.trim()) ||
@@ -617,6 +637,18 @@ export function OrdersManager({
                   <span className="text-muted-foreground">{t("orderShipping")}</span>
                   <span>{shippingLabel(order.shipping_method)}</span>
                 </div>
+                {shippingZoneInfo?.name ? (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">{t("shippingZone")}</span>
+                    <span className="text-end">{shippingZoneInfo.name}</span>
+                  </div>
+                ) : null}
+                {shippingZoneInfo?.price != null ? (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">{t("shippingZoneCost")}</span>
+                    <span className="tabular-nums">{formatMoney(shippingZoneInfo.price)}</span>
+                  </div>
+                ) : null}
                 <div className="flex justify-between gap-4">
                   <span className="shrink-0 text-muted-foreground">{t("customer")}</span>
                   <span className="min-w-0 break-words text-end">
@@ -649,7 +681,7 @@ export function OrdersManager({
                   <span>{formatMoney(order.subtotal)}</span>
                 </div>
                 {order.coupon_code?.trim() ? (
-                  <div className="flex justify-between gap-3">
+                  <div className="flex flex-wrap justify-between gap-3">
                     <span className="text-muted-foreground">{t("coupon")}</span>
                     <span dir="ltr" className="break-all">
                       {order.coupon_code.trim()}
@@ -667,11 +699,11 @@ export function OrdersManager({
                 )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t("shippingFee")}</span>
-                  <span>{formatMoney(order.shipping_fee)}</span>
+                  <span className="tabular-nums">{formatMoney(order.shipping_fee)}</span>
                 </div>
                 <div className="flex justify-between border-t pt-2 font-semibold">
                   <span>{t("total")}</span>
-                  <span>{formatMoney(order.total)}</span>
+                  <span className="tabular-nums">{formatMoney(order.total)}</span>
                 </div>
               </Card>
 

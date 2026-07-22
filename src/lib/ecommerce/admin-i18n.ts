@@ -79,8 +79,8 @@ export const ecommerceAdminDict: Record<string, Entry> = {
   },
   quickSettings: { he: "הגדרות", ar: "الإعدادات" },
   quickSettingsDesc: {
-    he: "טלפון ומחירי משלוח",
-    ar: "الهاتف وأسعار الشحن",
+    he: "טלפון, משלוחים ואזורי משלוח",
+    ar: "الهاتف والشحن ومناطق التوصيل",
   },
 
   // — Settings —
@@ -107,8 +107,47 @@ export const ecommerceAdminDict: Record<string, Entry> = {
   phone: { he: "מספר טלפון", ar: "رقم الهاتف" },
   phoneField: { he: "מספר טלפון", ar: "رقم الهاتف" },
   shipping: { he: "משלוחים", ar: "الشحن" },
-  shippingFlat: { he: "מחיר משלוח עד הבית (₪)", ar: "سعر التوصيل للمنزل (₪)" },
   shippingFree: { he: "משלוח חינם מעל סכום (₪)", ar: "شحن مجاني فوق مبلغ (₪)" },
+  shippingFreeHint: {
+    he: "כשההזמנה מגיעה לסכום הזה ומעלה — המשלוח חינם, גם אם נבחר אזור משלוח בתשלום.",
+    ar: "عندما يصل الطلب إلى هذا المبلغ أو أكثر — يصبح الشحن مجانيًا، حتى إذا اختيرت منطقة شحن مدفوعة.",
+  },
+  shippingZonesTitle: { he: "אזורי משלוח", ar: "مناطق الشحن" },
+  shippingZonesSubtitle: {
+    he: "הגדירו אזורים ומחיר משלוח לכל אזור. שינוי פעיל/מושבת נשמר רק בלחיצה על שמירת הגדרות.",
+    ar: "عرّفوا المناطق وسعر الشحن لكل منطقة. تفعيل/تعطيل المنطقة يُحفظ فقط عند الضغط على حفظ الإعدادات.",
+  },
+  shippingZonesMigrationHint: {
+    he: "יש להריץ את project-db-migrations/migrations_shipping_zones.sql ב-Supabase של החנות (SQL Editor) ואז לרענן.",
+    ar: "شغّل project-db-migrations/migrations_shipping_zones.sql في Supabase للمتجر (SQL Editor) ثم حدّث الصفحة.",
+  },
+  shippingZonesEmpty: {
+    he: "עדיין אין אזורי משלוח. הוסיפו אזור ראשון.",
+    ar: "لا توجد مناطق شحن بعد. أضيفوا المنطقة الأولى.",
+  },
+  shippingZoneAdd: { he: "הוספת אזור", ar: "إضافة منطقة" },
+  shippingZoneEdit: { he: "עריכת אזור", ar: "تعديل المنطقة" },
+  shippingZoneDialogSubtitle: {
+    he: "שם האזור יופיע ללקוח בבחירת משלוח לבית. המחיר בשקלים.",
+    ar: "سيظهر اسم المنطقة للعميل عند اختيار التوصيل للمنزل. السعر بالشيكل.",
+  },
+  shippingZoneNameHe: { he: "שם בעברית", ar: "الاسم بالعبرية" },
+  shippingZoneNameAr: { he: "שם בערבית", ar: "الاسم بالعربية" },
+  shippingZoneNameEn: { he: "שם באנגלית", ar: "الاسم بالإنجليزية" },
+  shippingZonePrice: { he: "מחיר משלוח (₪)", ar: "سعر الشحن (₪)" },
+  shippingZoneSortOrder: { he: "סדר תצוגה", ar: "ترتيب العرض" },
+  shippingZoneActive: { he: "פעיל", ar: "نشط" },
+  shippingZoneInactive: { he: "מושבת", ar: "معطّل" },
+  shippingZoneNameRequired: {
+    he: "יש למלא שם באחת השפות לפחות",
+    ar: "يجب إدخال اسم بلغة واحدة على الأقل",
+  },
+  shippingZonePriceInvalid: {
+    he: "מחיר חייב להיות מספר אי-שלילי",
+    ar: "يجب أن يكون السعر رقمًا غير سالب",
+  },
+  shippingZoneSaved: { he: "אזור המשלוח נשמר", ar: "تم حفظ منطقة الشحن" },
+  shippingZoneDeleted: { he: "אזור המשלוח נמחק", ar: "تم حذف منطقة الشحن" },
   saveSettings: { he: "שמירת הגדרות", ar: "حفظ الإعدادات" },
   languageTitle: { he: "שפת לוח הניהול", ar: "لغة لوحة الإدارة" },
   languageDesc: {
@@ -120,10 +159,6 @@ export const ecommerceAdminDict: Record<string, Entry> = {
   validationPhone: {
     he: "מספר טלפון לא תקין (9–15 ספרות)",
     ar: "رقم هاتف غير صالح (9–15 رقمًا)",
-  },
-  validationShippingFlat: {
-    he: "מחיר משלוח חייב להיות מספר אי-שלילי",
-    ar: "يجب أن يكون سعر الشحن رقمًا غير سالب",
   },
   validationShippingFree: {
     he: "סף משלוח חינם חייב להיות מספר אי-שלילי",
@@ -216,6 +251,8 @@ export const ecommerceAdminDict: Record<string, Entry> = {
   updateStatus: { he: "עדכון סטטוס", ar: "تحديث الحالة" },
   orderShipping: { he: "משלוח", ar: "الشحن" },
   customer: { he: "לקוח", ar: "العميل" },
+  shippingZone: { he: "אזור משלוח", ar: "منطقة الشحن" },
+  shippingZoneCost: { he: "עלות אזור", ar: "تكلفة المنطقة" },
   shippingAddress: { he: "כתובת משלוח", ar: "عنوان الشحن" },
   subtotal: { he: "סכום ביניים", ar: "المجموع الفرعي" },
   discount: { he: "הנחה", ar: "الخصم" },

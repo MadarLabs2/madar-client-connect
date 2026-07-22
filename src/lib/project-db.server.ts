@@ -67,6 +67,7 @@ export const ALLOWED_TABLES = [
   "coupons",
   "newsletter_subscribers",
   "site_settings",
+  "shipping_zones",
   "delivery_places",
   "fulfillment_available_days",
   "bakery_rest_days",

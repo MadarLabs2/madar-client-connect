@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -13,6 +13,10 @@ import {
 } from "@/lib/ecommerce/theme";
 import { useEcommerceTheme } from "@/lib/ecommerce/EcommerceThemeContext";
 import { ECOMMERCE_LANGS, useEcommerceT, type EcommerceLang } from "@/lib/ecommerce/i18n";
+import {
+  EcommerceShippingZonesSection,
+  type FlushShippingZoneActiveFn,
+} from "@/components/manage/ecommerce/EcommerceShippingZonesSection";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,14 +24,12 @@ import { cn } from "@/lib/utils";
 
 type SettingsForm = {
   contact_phone_display: string;
-  shipping_home_flat_nis: string;
   shipping_free_above_subtotal_nis: string;
   admin_accent_preset: EcommerceAccentId;
 };
 
 const EMPTY: SettingsForm = {
   contact_phone_display: "",
-  shipping_home_flat_nis: "0",
   shipping_free_above_subtotal_nis: "0",
   admin_accent_preset: DEFAULT_ECOMMERCE_ACCENT,
 };
@@ -55,6 +57,11 @@ export function EcommerceSettingsPage({ projectId }: { projectId: string }) {
 
   const [form, setForm] = useState<SettingsForm>(EMPTY);
   const [saving, setSaving] = useState(false);
+  const flushZonesActiveRef = useRef<FlushShippingZoneActiveFn | null>(null);
+
+  const registerFlushZonesActive = useCallback((fn: FlushShippingZoneActiveFn | null) => {
+    flushZonesActiveRef.current = fn;
+  }, []);
 
   useEffect(() => {
     if (!current) {
@@ -63,7 +70,6 @@ export function EcommerceSettingsPage({ projectId }: { projectId: string }) {
     }
     setForm({
       contact_phone_display: String(current.contact_phone_display ?? ""),
-      shipping_home_flat_nis: String(current.shipping_home_flat_nis ?? 0),
       shipping_free_above_subtotal_nis: String(current.shipping_free_above_subtotal_nis ?? 0),
       admin_accent_preset: parseAccentId(current.admin_accent_preset) ?? liveAccentId,
     });
@@ -77,12 +83,7 @@ export function EcommerceSettingsPage({ projectId }: { projectId: string }) {
       toast.error(t("validationPhone"));
       return false;
     }
-    const flat = Number(form.shipping_home_flat_nis);
     const free = Number(form.shipping_free_above_subtotal_nis);
-    if (!Number.isFinite(flat) || flat < 0) {
-      toast.error(t("validationShippingFlat"));
-      return false;
-    }
     if (!Number.isFinite(free) || free < 0) {
       toast.error(t("validationShippingFree"));
       return false;
@@ -96,7 +97,6 @@ export function EcommerceSettingsPage({ projectId }: { projectId: string }) {
     try {
       const baseRow = {
         contact_phone_display: form.contact_phone_display.trim(),
-        shipping_home_flat_nis: Number(form.shipping_home_flat_nis),
         shipping_free_above_subtotal_nis: Number(form.shipping_free_above_subtotal_nis),
       };
 
@@ -123,6 +123,9 @@ export function EcommerceSettingsPage({ projectId }: { projectId: string }) {
       }
 
       persistAccentLocal(projectId, form.admin_accent_preset);
+      if (flushZonesActiveRef.current) {
+        await flushZonesActiveRef.current();
+      }
       toast.success(accentSavedToDb ? t("settingsSaved") : t("accentSavedLocal"));
       qc.invalidateQueries({ queryKey: ["pdb", projectId, "site_settings"] });
       qc.invalidateQueries({ queryKey: ["ecommerce", projectId, "theme"] });
@@ -235,15 +238,8 @@ export function EcommerceSettingsPage({ projectId }: { projectId: string }) {
 
       <Card className="border-border/70 p-5">
         <h2 className="font-display text-xl">{t("shipping")}</h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <Field label={t("shippingFlat")}>
-            <Input
-              type="number"
-              min={0}
-              value={form.shipping_home_flat_nis}
-              onChange={(e) => update("shipping_home_flat_nis", e.target.value)}
-            />
-          </Field>
+        <p className="mt-1 text-sm text-muted-foreground">{t("shippingFreeHint")}</p>
+        <div className="mt-4 max-w-md">
           <Field label={t("shippingFree")}>
             <Input
               type="number"
@@ -254,6 +250,11 @@ export function EcommerceSettingsPage({ projectId }: { projectId: string }) {
           </Field>
         </div>
       </Card>
+
+      <EcommerceShippingZonesSection
+        projectId={projectId}
+        registerFlushActive={registerFlushZonesActive}
+      />
 
       <div className="flex justify-end">
         <Button onClick={() => void handleSave()} disabled={saving}>
