@@ -8,8 +8,11 @@ import {
   ChefHat,
   Clock,
   Filter,
+  Minus,
   Package,
+  Plus,
   ShoppingBag,
+  Trash2,
   Truck,
   X,
   XCircle,
@@ -30,13 +33,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useBakeryDb } from "@/lib/bakery/db";
 import { useBakeryT } from "@/lib/bakery/i18n";
 import type { Lang } from "@/lib/i18n";
 import { formatOrderDate, formatOrderDateDisplay } from "@/lib/bakery/formatDate";
 import { adminOrderStatusLabel, adminOrderStatusPillClass } from "@/lib/bakery/adminLabels";
-import { resolveImage } from "@/lib/bakery/utils";
+import { pickName, resolveImage } from "@/lib/bakery/utils";
 import {
   buildScheduleDateOptions,
   enabledDaysFromMap,
@@ -48,9 +52,15 @@ import {
 import { WEEKDAY_DICT_KEYS } from "@/lib/bakery/fulfillmentDays-i18n";
 import { fetchAdminRestDays } from "@/lib/bakery/restDays";
 import { cn } from "@/lib/utils";
-import { isOrderVisibleInAdmin, sumOrderRevenue } from "@/lib/bakery/orderPayment";
+import { isCashOrder, isOrderVisibleInAdmin, sumOrderRevenue } from "@/lib/bakery/orderPayment";
 import { fulfillmentLabelFromOrder } from "@/lib/bakery/fulfillmentLabel";
 import { sendOrderStatusEmailFn } from "@/lib/bakery/sendOrderStatusEmail.functions";
+import {
+  bakeryAddCashOrderItemFn,
+  bakeryDeleteCashOrderItemFn,
+  bakeryUpdateCashOrderItemQtyFn,
+  bakeryUpdateOrderStatusFn,
+} from "@/lib/bakery/modifyCashOrderItems.functions";
 import { useAuth } from "@/lib/auth";
 import { useBakeryPendingOrders } from "@/components/manage/bakery/BakeryPendingOrdersContext";
 
@@ -384,6 +394,10 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
   const { session } = useAuth();
   const { ordersRevision } = useBakeryPendingOrders();
   const sendStatusEmailFn = useServerFn(sendOrderStatusEmailFn);
+  const addCashItemFn = useServerFn(bakeryAddCashOrderItemFn);
+  const deleteCashItemFn = useServerFn(bakeryDeleteCashOrderItemFn);
+  const updateCashItemQtyFn = useServerFn(bakeryUpdateCashOrderItemQtyFn);
+  const updateOrderStatusFn = useServerFn(bakeryUpdateOrderStatusFn);
 
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [scheduleDates, setScheduleDates] = useState<ScheduleDateOption[]>([]);
@@ -392,6 +406,11 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
   const [dayFilter, setDayFilter] = useState<string | null>(null);
   const [productFilterId, setProductFilterId] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
+  const [editingItems, setEditingItems] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState<Record<string, unknown>[]>([]);
+  const [addProductId, setAddProductId] = useState("");
+  const [addQty, setAddQty] = useState("1");
+  const [itemBusy, setItemBusy] = useState(false);
 
   const weekdayLabel = (dayOfWeek: number) => t(WEEKDAY_DICT_KEYS[dayOfWeek] ?? "weekdaySunday");
 
@@ -409,7 +428,12 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
         toast.error(ordersRes.error.message);
         return;
       }
-      setOrders(normalizeOrders((ordersRes.data ?? []) as OrderRow[]));
+      const nextOrders = normalizeOrders((ordersRes.data ?? []) as OrderRow[]);
+      setOrders(nextOrders);
+      setSelected((prev) => {
+        if (!prev) return prev;
+        return nextOrders.find((o) => o.id === prev.id) ?? prev;
+      });
 
       if (daysRes.ok) {
         const restDays = restRes.ok ? restRes.rows : [];
@@ -433,12 +457,122 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
     void load();
   }, [projectId, ordersRevision]);
 
+  useEffect(() => {
+    if (!selected) {
+      setEditingItems(false);
+      setAddProductId("");
+      setAddQty("1");
+      setCatalogProducts([]);
+    }
+  }, [selected?.id]);
+
+  const canEditCashItems =
+    !!selected &&
+    isCashOrder({ payment_method: selected.payment_method as string | null }) &&
+    String(selected.order_status ?? "").toLowerCase() !== "cancelled" &&
+    String(selected.order_status ?? "").toLowerCase() !== "completed";
+
+  const loadCatalogProducts = async () => {
+    const { data, error } = await db
+      .from("products")
+      .select("id, name, name_he, name_en, name_ar, price, stock_quantity, is_available, image_url")
+      .order("name", { ascending: true })
+      .limit(500);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setCatalogProducts(
+      ((data ?? []) as Record<string, unknown>[]).filter((p) => p.is_available !== false),
+    );
+  };
+
+  const mapItemError = (message: string) => {
+    if (message.includes("INSUFFICIENT_STOCK")) return t("adminOrderInsufficientStock");
+    if (message.includes("LAST_ITEM")) return t("adminOrderCannotRemoveLastItem");
+    if (message.includes("NOT_CASH_ORDER")) return t("adminOrderCashOnlyEdit");
+    return message || t("genericError");
+  };
+
+  const handleAddItem = async () => {
+    if (!selected || !addProductId) return;
+    const qty = Math.max(1, Math.min(999, Math.floor(Number(addQty) || 0)));
+    if (!Number.isFinite(qty) || qty < 1) return;
+    setItemBusy(true);
+    try {
+      await addCashItemFn({
+        data: {
+          projectId,
+          orderId: selected.id,
+          productId: addProductId,
+          quantity: qty,
+        },
+      });
+      toast.success(t("adminOrderItemsUpdated"));
+      setAddProductId("");
+      setAddQty("1");
+      await load();
+    } catch (error) {
+      toast.error(mapItemError(error instanceof Error ? error.message : String(error)));
+    } finally {
+      setItemBusy(false);
+    }
+  };
+
+  const handleUpdateItemQty = async (orderItemId: string, quantity: number) => {
+    if (!selected) return;
+    const qty = Math.max(1, Math.min(999, Math.floor(quantity)));
+    if (!Number.isFinite(qty) || qty < 1) return;
+    setItemBusy(true);
+    try {
+      await updateCashItemQtyFn({
+        data: {
+          projectId,
+          orderId: selected.id,
+          orderItemId,
+          quantity: qty,
+        },
+      });
+      toast.success(t("adminOrderItemsUpdated"));
+      await load();
+    } catch (error) {
+      toast.error(mapItemError(error instanceof Error ? error.message : String(error)));
+    } finally {
+      setItemBusy(false);
+    }
+  };
+
+  const handleRemoveItem = async (orderItemId: string) => {
+    if (!selected) return;
+    if (!window.confirm(t("adminOrderRemoveItemConfirm"))) return;
+    setItemBusy(true);
+    try {
+      await deleteCashItemFn({
+        data: {
+          projectId,
+          orderId: selected.id,
+          orderItemId,
+        },
+      });
+      toast.success(t("adminOrderItemsUpdated"));
+      await load();
+    } catch (error) {
+      toast.error(mapItemError(error instanceof Error ? error.message : String(error)));
+    } finally {
+      setItemBusy(false);
+    }
+  };
+
   const setStatus = async (id: string, status: string) => {
     try {
-      const { error } = await db.from("orders").update({ order_status: status }).eq("id", id);
-      if (error) throw error;
+      await updateOrderStatusFn({
+        data: { projectId, orderId: id, status },
+      });
       toast.success(t("updated"));
       setSelected((s) => (s && s.id === id ? { ...s, order_status: status } : s));
+      if (status.toLowerCase() === "cancelled") {
+        setEditingItems(false);
+      }
       void load();
       if (session?.access_token) {
         void sendStatusEmailFn({
@@ -1007,17 +1141,101 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
                 </section>
 
                 <section className="mt-3 rounded-xl border border-stone-200/80 bg-white p-3 shadow-sm">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6b8577]">
-                    {t("adminOrderDetailSectionItems")}
-                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6b8577]">
+                      {t("adminOrderDetailSectionItems")}
+                    </p>
+                    {canEditCashItems ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={itemBusy}
+                        className="h-8 border-[#1B4332]/25 text-xs text-[#1B4332] hover:bg-[#1B4332]/5"
+                        onClick={() => {
+                          if (editingItems) {
+                            setEditingItems(false);
+                            setAddProductId("");
+                            setAddQty("1");
+                            return;
+                          }
+                          setEditingItems(true);
+                          void loadCatalogProducts();
+                        }}
+                      >
+                        {editingItems ? t("adminOrderEditItemsDone") : t("adminOrderEditItems")}
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  {editingItems && canEditCashItems ? (
+                    <div className="mt-3 space-y-2 rounded-lg border border-dashed border-[#1B4332]/25 bg-[#faf8f4]/80 p-2.5">
+                      <p className="text-xs font-semibold text-[#1B4332]">{t("adminOrderAddItem")}</p>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                        <div className="min-w-0 flex-1">
+                          <label className="mb-1 block text-[10px] font-medium text-neutral-500">
+                            {t("adminOrderChooseProduct")}
+                          </label>
+                          <Select value={addProductId || undefined} onValueChange={setAddProductId}>
+                            <SelectTrigger className="h-9 bg-white text-sm">
+                              <SelectValue placeholder={t("adminOrderChooseProduct")} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {catalogProducts.map((p) => {
+                                const stock =
+                                  p.stock_quantity == null
+                                    ? null
+                                    : Number(p.stock_quantity);
+                                const label = pickName(p, lang);
+                                const stockHint =
+                                  stock == null ? "" : ` · ${stock}`;
+                                return (
+                                  <SelectItem key={String(p.id)} value={String(p.id)}>
+                                    {label}
+                                    {stockHint} · ₪{Number(p.price ?? 0).toFixed(2)}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="w-24 shrink-0">
+                          <label className="mb-1 block text-[10px] font-medium text-neutral-500">
+                            {t("adminOrderItemQty")}
+                          </label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={999}
+                            value={addQty}
+                            onChange={(e) => setAddQty(e.target.value)}
+                            className="h-9 bg-white"
+                            dir="ltr"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={itemBusy || !addProductId}
+                          className="h-9 bg-[#1B4332] text-white hover:bg-[#163628]"
+                          onClick={() => void handleAddItem()}
+                        >
+                          <Plus className="me-1 h-3.5 w-3.5" aria-hidden />
+                          {t("adminOrderAddItemConfirm")}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <ul className="mt-2 divide-y divide-stone-100">
                     {(Array.isArray(selected.items) ? selected.items : []).map((raw, index) => {
                       const it = raw as Record<string, unknown>;
                       const product = it.product as Record<string, unknown> | undefined;
-                      const rawUrl = product?.image_url as string | undefined;
+                      const rawUrl = (product?.image_url ?? it.image_url) as string | undefined;
                       const thumb = rawUrl ? resolveImage(rawUrl) : null;
+                      const itemId = String(it.id ?? "");
                       return (
-                        <li key={String(it.id ?? index)} className="flex gap-3 py-2.5 first:pt-0">
+                        <li key={itemId || String(index)} className="flex gap-3 py-2.5 first:pt-0">
                           <div className="flex h-11 w-11 shrink-0 overflow-hidden rounded-md border border-stone-200 bg-stone-50">
                             {thumb ? (
                               <img
@@ -1034,16 +1252,68 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
                             <p className="font-medium leading-snug text-[#2f6a4f]">
                               {String(it.product_name ?? "")}
                             </p>
-                            <p className="mt-0.5 text-xs tabular-nums text-neutral-500" dir="ltr">
-                              {Number(it.quantity ?? 0)} × ₪{Number(it.product_price ?? 0).toFixed(2)}
-                            </p>
+                            {editingItems && canEditCashItems && itemId ? (
+                              <div className="mt-1.5 flex items-center gap-1.5">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  disabled={itemBusy || Number(it.quantity ?? 0) <= 1}
+                                  className="h-7 w-7 border-stone-200"
+                                  aria-label={t("adminOrderDecreaseQty")}
+                                  onClick={() =>
+                                    void handleUpdateItemQty(itemId, Number(it.quantity ?? 0) - 1)
+                                  }
+                                >
+                                  <Minus className="h-3.5 w-3.5" aria-hidden />
+                                </Button>
+                                <span className="min-w-7 text-center text-sm font-semibold tabular-nums" dir="ltr">
+                                  {Number(it.quantity ?? 0)}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  disabled={itemBusy}
+                                  className="h-7 w-7 border-stone-200"
+                                  aria-label={t("adminOrderIncreaseQty")}
+                                  onClick={() =>
+                                    void handleUpdateItemQty(itemId, Number(it.quantity ?? 0) + 1)
+                                  }
+                                >
+                                  <Plus className="h-3.5 w-3.5" aria-hidden />
+                                </Button>
+                                <span className="ms-1 text-xs tabular-nums text-neutral-500" dir="ltr">
+                                  × ₪{Number(it.product_price ?? 0).toFixed(2)}
+                                </span>
+                              </div>
+                            ) : (
+                              <p className="mt-0.5 text-xs tabular-nums text-neutral-500" dir="ltr">
+                                {Number(it.quantity ?? 0)} × ₪{Number(it.product_price ?? 0).toFixed(2)}
+                              </p>
+                            )}
                           </div>
-                          <span
-                            className="shrink-0 text-sm font-semibold tabular-nums text-neutral-900"
-                            dir="ltr"
-                          >
-                            ₪{Number(it.total_price ?? 0).toFixed(2)}
-                          </span>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <span
+                              className="text-sm font-semibold tabular-nums text-neutral-900"
+                              dir="ltr"
+                            >
+                              ₪{Number(it.total_price ?? 0).toFixed(2)}
+                            </span>
+                            {editingItems && canEditCashItems && itemId ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                disabled={itemBusy}
+                                className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                aria-label={t("adminOrderRemoveItem")}
+                                onClick={() => void handleRemoveItem(itemId)}
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden />
+                              </Button>
+                            ) : null}
+                          </div>
                         </li>
                       );
                     })}

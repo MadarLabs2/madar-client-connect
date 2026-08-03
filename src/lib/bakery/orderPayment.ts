@@ -4,6 +4,10 @@ export function isCreditCardOrder(order: { payment_method?: string | null }) {
   return k === "credit_card" || k === "card";
 }
 
+export function isCashOrder(order: { payment_method?: string | null }) {
+  return String(order.payment_method ?? "").toLowerCase() === "cash";
+}
+
 export function isOrderPaymentSettled(order: {
   payment_method?: string | null;
   payment_status?: string | null;
