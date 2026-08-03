@@ -4,6 +4,7 @@ import { OrderRefAndDate } from "@/components/manage/bakery/OrderRefAndDate";
 import { useBakeryDb } from "@/lib/bakery/db";
 import { useBakeryT } from "@/lib/bakery/i18n";
 import { adminOrderStatusLabel } from "@/lib/bakery/adminLabels";
+import { sumOrderRevenue } from "@/lib/bakery/orderPayment";
 
 type BakeryReportsPageProps = { projectId: string };
 
@@ -29,7 +30,7 @@ export function BakeryReportsPage({ projectId }: BakeryReportsPageProps) {
         db.from("orders").select("id", { head: true, count: "exact" }),
         db.from("products").select("id", { head: true, count: "exact" }),
         db.from("products").select("id", { head: true, count: "exact" }).eq("is_best_seller", true),
-        db.from("orders").select("total_amount").limit(5000),
+        db.from("orders").select("total_amount, order_status").limit(5000),
         db
           .from("orders")
           .select("id, customer_name, order_status, created_at, total_amount")
@@ -37,9 +38,11 @@ export function BakeryReportsPage({ projectId }: BakeryReportsPageProps) {
           .limit(8),
       ]);
       if (cancelled) return;
-      const revenue = ((totals.data ?? []) as Array<{ total_amount?: number | string | null }>).reduce(
-        (s, x) => s + Number(x.total_amount ?? 0),
-        0,
+      const revenue = sumOrderRevenue(
+        (totals.data ?? []) as Array<{
+          total_amount?: number | string | null;
+          order_status?: string | null;
+        }>,
       );
       setStats({
         orders: o.count ?? 0,

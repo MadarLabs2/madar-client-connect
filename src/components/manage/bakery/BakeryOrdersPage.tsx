@@ -48,7 +48,7 @@ import {
 import { WEEKDAY_DICT_KEYS } from "@/lib/bakery/fulfillmentDays-i18n";
 import { fetchAdminRestDays } from "@/lib/bakery/restDays";
 import { cn } from "@/lib/utils";
-import { isOrderVisibleInAdmin } from "@/lib/bakery/orderPayment";
+import { isOrderVisibleInAdmin, sumOrderRevenue } from "@/lib/bakery/orderPayment";
 import { fulfillmentLabelFromOrder } from "@/lib/bakery/fulfillmentLabel";
 import { sendOrderStatusEmailFn } from "@/lib/bakery/sendOrderStatusEmail.functions";
 import { useAuth } from "@/lib/auth";
@@ -470,8 +470,8 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
     const yOrders = dayBucket(orders, y);
     const cToday = tOrders.length;
     const cY = yOrders.length;
-    const sToday = tOrders.reduce((acc, o) => acc + Number(o.total_amount ?? 0), 0);
-    const sY = yOrders.reduce((acc, o) => acc + Number(o.total_amount ?? 0), 0);
+    const sToday = sumOrderRevenue(tOrders);
+    const sY = sumOrderRevenue(yOrders);
     return {
       cToday,
       cY,
@@ -505,7 +505,7 @@ export function BakeryOrdersPage({ projectId }: BakeryOrdersPageProps) {
 
   const dayFilterSummary = useMemo(() => {
     if (!dayFilter) return null;
-    const sales = ordersForTabs.reduce((acc, o) => acc + Number(o.total_amount ?? 0), 0);
+    const sales = sumOrderRevenue(ordersForTabs);
     const label = scheduleDates.find((d) => d.isoDate === dayFilter)?.label ?? dayFilter;
     return { count: ordersForTabs.length, sales, label };
   }, [ordersForTabs, dayFilter, scheduleDates]);

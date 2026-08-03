@@ -23,4 +23,18 @@ export function isOrderVisibleInAdmin(order: {
   return isOrderPaymentSettled(order);
 }
 
+/** Cancelled orders must not count toward sales / revenue KPIs. */
+export function isOrderCountedInRevenue(order: { order_status?: string | null }): boolean {
+  return String(order.order_status ?? "").toLowerCase() !== "cancelled";
+}
+
+export function sumOrderRevenue(
+  orders: Array<{ total_amount?: number | string | null; order_status?: string | null }>,
+): number {
+  return orders.reduce((acc, o) => {
+    if (!isOrderCountedInRevenue(o)) return acc;
+    return acc + Number(o.total_amount ?? 0);
+  }, 0);
+}
+
 export const PENDING_CARD_ORDER_STORAGE_KEY = "pendingCardOrderId";

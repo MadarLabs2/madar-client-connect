@@ -21,6 +21,7 @@ import { useBakeryT } from "@/lib/bakery/i18n";
 import { formatOrderDateDisplay } from "@/lib/bakery/formatDate";
 import { useBakeryPendingOrderCount, useBakeryPendingOrders } from "@/lib/bakery/useBakeryPendingOrderCount";
 import { adminOrderStatusLabel, adminOrderStatusPillClass } from "@/lib/bakery/adminLabels";
+import { sumOrderRevenue } from "@/lib/bakery/orderPayment";
 
 type BakeryDashboardProps = {
   projectId: string;
@@ -186,7 +187,7 @@ export function BakeryDashboard({ projectId, activeTab, onTabChange }: BakeryDas
       const [ordersRes, productsRes, totalsRes, subsCount, recentRes] = await Promise.all([
         db.from("orders").select("id", { head: true, count: "exact" }),
         db.from("products").select("id", { head: true, count: "exact" }),
-        db.from("orders").select("total_amount"),
+        db.from("orders").select("total_amount, order_status"),
         subscriberCount(db),
         db
           .from("orders")
@@ -194,9 +195,11 @@ export function BakeryDashboard({ projectId, activeTab, onTabChange }: BakeryDas
           .order("created_at", { ascending: false })
           .limit(6),
       ]);
-      const revenue = ((totalsRes.data ?? []) as Array<{ total_amount?: number | string | null }>).reduce(
-        (s, x) => s + Number(x.total_amount ?? 0),
-        0,
+      const revenue = sumOrderRevenue(
+        (totalsRes.data ?? []) as Array<{
+          total_amount?: number | string | null;
+          order_status?: string | null;
+        }>,
       );
       return {
         revenue,
