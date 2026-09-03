@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BarChart3,
   Bell,
+  ClipboardList,
   ExternalLink,
   LayoutDashboard,
   Menu,
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "coupons", icon: Ticket },
   { id: "reports", icon: BarChart3 },
   { id: "notifications", icon: Bell },
+  { id: "employees", icon: ClipboardList },
   { id: "settings", icon: Settings },
 ];
 

@@ -9,6 +9,7 @@ import { ReportsManager } from "@/components/manage/ReportsManager";
 import { CouponsManager } from "@/components/manage/CouponsManager";
 import { NotificationsManager } from "@/components/manage/NotificationsManager";
 import { EcommerceSettingsPage } from "@/components/manage/ecommerce/EcommerceSettingsPage";
+import { EcommerceEmployeesPage } from "@/components/manage/ecommerce/EcommerceEmployeesPage";
 import { EcommercePendingOrdersProvider } from "@/components/manage/ecommerce/EcommercePendingOrdersContext";
 import { EcommerceThemeProvider } from "@/lib/ecommerce/EcommerceThemeContext";
 import { EcommerceI18nProvider, useEcommerceT } from "@/lib/ecommerce/i18n";
@@ -32,6 +33,7 @@ const CREDENTIAL_TABS = new Set([
   "coupons",
   "reports",
   "notifications",
+  "employees",
   "settings",
 ]);
 
@@ -89,6 +91,7 @@ export function EcommerceManageApp({
     if (activeTab === "reports") return <ReportsManager projectId={projectId} />;
     if (activeTab === "coupons") return <CouponsManager projectId={projectId} />;
     if (activeTab === "notifications") return <NotificationsManager projectId={projectId} />;
+    if (activeTab === "employees") return <EcommerceEmployeesPage projectId={projectId} />;
     if (activeTab === "settings") return <EcommerceSettingsPage projectId={projectId} />;
     return null;
   };

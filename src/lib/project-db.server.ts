@@ -74,5 +74,7 @@ export const ALLOWED_TABLES = [
   "email_subscribers",
   "email_campaigns",
   "store_settings",
+  "employees",
+  "attendance",
 ] as const;
 export type AllowedTable = (typeof ALLOWED_TABLES)[number];
