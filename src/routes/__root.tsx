@@ -64,6 +64,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      { name: "robots", content: "noindex, nofollow, noarchive, nosnippet, noimageindex" },
+      { name: "googlebot", content: "noindex, nofollow, noarchive, nosnippet, noimageindex" },
       { title: "Madar Clients — Client Management Portal" },
       { name: "description", content: "Madar Clients: secure multi-tenant portal for managing client projects, finances, and communications." },
       { property: "og:title", content: "Madar Clients" },
