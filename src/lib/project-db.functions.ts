@@ -133,6 +133,25 @@ export const bakeryOrdersList = createServerFn({ method: "POST" })
     return { rows: normalizedRows, error: null };
   });
 
+const BAKERY_REPORT_ORDER_COLUMNS =
+  "id, user_id, customer_name, customer_email, created_at, total_amount, subtotal, delivery_fee, order_status, payment_method";
+
+/** All bakery orders needed for reports, including history beyond the 500-row admin list. */
+export const bakeryReportOrdersList = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ projectId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const admin = await isAdmin(context.userId);
+    const client = await getProjectClient(data.projectId, context.userId, admin);
+    const { data: rows, error } = await client
+      .from("orders")
+      .select(BAKERY_REPORT_ORDER_COLUMNS)
+      .order("created_at", { ascending: false })
+      .limit(20000);
+    if (error) return { rows: [], error: error.message };
+    return { rows: rows ?? [], error: null };
+  });
+
 const ECOMMERCE_ORDER_LIST_COLUMNS =
   "id, order_number, status, shipping_method, shipping_fee, subtotal, total, coupon_code, created_at, customer_name, customer_email, user_id";
 

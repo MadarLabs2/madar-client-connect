@@ -21,7 +21,7 @@ import { useBakeryT } from "@/lib/bakery/i18n";
 import { formatOrderDateDisplay } from "@/lib/bakery/formatDate";
 import { useBakeryPendingOrderCount, useBakeryPendingOrders } from "@/lib/bakery/useBakeryPendingOrderCount";
 import { adminOrderStatusLabel, adminOrderStatusPillClass } from "@/lib/bakery/adminLabels";
-import { sumOrderRevenue } from "@/lib/bakery/orderPayment";
+import { isOrderCountedInRevenue, sumOrderRevenue } from "@/lib/bakery/orderPayment";
 
 type BakeryDashboardProps = {
   projectId: string;
@@ -184,10 +184,13 @@ export function BakeryDashboard({ projectId, activeTab, onTabChange }: BakeryDas
   const { data } = useQuery({
     queryKey: ["bakery", projectId, "dashboard-kpis", ordersRevision],
     queryFn: async () => {
-      const [ordersRes, productsRes, totalsRes, subsCount, recentRes] = await Promise.all([
-        db.from("orders").select("id", { head: true, count: "exact" }),
+      const [productsRes, totalsRes, subsCount, recentRes] = await Promise.all([
         db.from("products").select("id", { head: true, count: "exact" }),
-        db.from("orders").select("total_amount, order_status"),
+        db
+          .from("orders")
+          .select("total_amount, order_status, created_at")
+          .order("created_at", { ascending: false })
+          .limit(500),
         subscriberCount(db),
         db
           .from("orders")
@@ -195,15 +198,20 @@ export function BakeryDashboard({ projectId, activeTab, onTabChange }: BakeryDas
           .order("created_at", { ascending: false })
           .limit(6),
       ]);
-      const revenue = sumOrderRevenue(
-        (totalsRes.data ?? []) as Array<{
-          total_amount?: number | string | null;
-          order_status?: string | null;
-        }>,
-      );
+      const now = new Date();
+      const monthOrders = ((totalsRes.data ?? []) as Array<{
+        total_amount?: number | string | null;
+        order_status?: string | null;
+        created_at?: string | null;
+      }>).filter((order) => {
+        if (!isOrderCountedInRevenue(order)) return false;
+        if (!order.created_at) return false;
+        const created = new Date(order.created_at);
+        return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
+      });
       return {
-        revenue,
-        orders: ordersRes.count ?? 0,
+        revenue: sumOrderRevenue(monthOrders),
+        orders: monthOrders.length,
         products: productsRes.count ?? 0,
         subscribers: subsCount,
         recent: (recentRes.data ?? []) as OrderRow[],
@@ -226,15 +234,15 @@ export function BakeryDashboard({ projectId, activeTab, onTabChange }: BakeryDas
 
   const kpis = [
     {
-      labelKey: "adminMetricRevenue" as const,
+      labelKey: "adminMetricRevenueMonth" as const,
       value: `₪${(data?.revenue ?? 0).toFixed(2)}`,
-      badge: t("adminKpiBadgeAllTime"),
+      badge: t("adminKpiBadgeThisMonth"),
       badgeClass: "bg-[#e8f0eb] text-[#2d5544] ring-1 ring-[#2d5544]/12",
     },
     {
-      labelKey: "adminMetricTotalOrders" as const,
+      labelKey: "adminMetricOrdersMonth" as const,
       value: data?.orders ?? 0,
-      badge: t("adminKpiBadgeLive"),
+      badge: t("adminKpiBadgeThisMonth"),
       badgeClass: "bg-[#f7efe6] text-[#8b5a2b] ring-1 ring-[#8b5a2b]/15",
     },
     {
