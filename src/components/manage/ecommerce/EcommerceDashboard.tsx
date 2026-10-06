@@ -112,14 +112,19 @@ export function EcommerceDashboard({
   }, [ordersRes]);
 
   const metrics = useMemo(() => {
-    const nonCancelled = orders.filter((o) => o.status !== "cancelled");
-    const totalRevenue = nonCancelled.reduce((s, o) => s + o.total, 0);
+    const now = new Date();
+    const monthOrders = orders.filter((o) => {
+      if (o.status === "cancelled" || !o.created_at) return false;
+      const created = new Date(o.created_at);
+      return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
+    });
+    const monthRevenue = monthOrders.reduce((s, o) => s + o.total, 0);
     const customerRows: any[] = customersRes?.rows ?? [];
     const customers = customerRows.filter((c) => String(c.role ?? "customer") === "customer").length;
 
     return {
-      totalRevenue,
-      totalOrders: orders.length,
+      monthRevenue,
+      monthOrders: monthOrders.length,
       customers,
       products: productsRes?.count ?? 0,
     };
@@ -151,14 +156,14 @@ export function EcommerceDashboard({
         </h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <KpiCard
-            label={t("totalRevenue")}
-            value={ordersLoading ? "…" : money(metrics.totalRevenue)}
-            hint={t("totalRevenueHint")}
+            label={t("revenueMonth")}
+            value={ordersLoading ? "…" : money(metrics.monthRevenue)}
+            hint={t("revenueMonthHint")}
           />
           <KpiCard
-            label={t("totalOrders")}
-            value={ordersLoading ? "…" : formatCount(metrics.totalOrders)}
-            hint={t("totalOrdersHint")}
+            label={t("ordersMonth")}
+            value={ordersLoading ? "…" : formatCount(metrics.monthOrders)}
+            hint={t("ordersMonthHint")}
           />
         </div>
       </section>

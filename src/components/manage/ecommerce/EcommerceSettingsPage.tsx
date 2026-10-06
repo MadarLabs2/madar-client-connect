@@ -17,9 +17,16 @@ import {
   EcommerceShippingZonesSection,
   type FlushShippingZoneActiveFn,
 } from "@/components/manage/ecommerce/EcommerceShippingZonesSection";
+import {
+  gateFromSettingsRow,
+  readEcommerceAdminGate,
+  writeEcommerceAdminGate,
+  type EcommerceAdminGate,
+} from "@/lib/ecommerce/manage-access";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 type SettingsForm = {
@@ -57,6 +64,13 @@ export function EcommerceSettingsPage({ projectId }: { projectId: string }) {
 
   const [form, setForm] = useState<SettingsForm>(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [gate, setGate] = useState<EcommerceAdminGate>(() => readEcommerceAdminGate(projectId));
+  const [gateSaving, setGateSaving] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [nextPassword, setNextPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordFormOpen, setPasswordFormOpen] = useState(false);
   const flushZonesActiveRef = useRef<FlushShippingZoneActiveFn | null>(null);
 
   const registerFlushZonesActive = useCallback((fn: FlushShippingZoneActiveFn | null) => {
@@ -73,7 +87,12 @@ export function EcommerceSettingsPage({ projectId }: { projectId: string }) {
       shipping_free_above_subtotal_nis: String(current.shipping_free_above_subtotal_nis ?? 0),
       admin_accent_preset: parseAccentId(current.admin_accent_preset) ?? liveAccentId,
     });
-  }, [current?.id, liveAccentId]); // eslint-disable-line react-hooks/exhaustive-deps
+    const storedGate = gateFromSettingsRow(current);
+    if (storedGate) {
+      writeEcommerceAdminGate(projectId, storedGate);
+      setGate(storedGate);
+    }
+  }, [current?.id, current?.admin_gate_enabled, current?.admin_gate_password, liveAccentId, projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = <K extends keyof SettingsForm>(key: K, val: SettingsForm[K]) =>
     setForm((s) => ({ ...s, [key]: val }));
@@ -135,6 +154,68 @@ export function EcommerceSettingsPage({ projectId }: { projectId: string }) {
       toast.error(err?.message || t("loadFailed"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const persistGate = async (next: EcommerceAdminGate) => {
+    writeEcommerceAdminGate(projectId, next);
+    setGate(next);
+    const row = {
+      admin_gate_enabled: next.enabled,
+      admin_gate_password: next.password,
+    };
+    try {
+      if (current?.id != null) {
+        await updateFn({ data: { projectId, table: "site_settings", id: current.id, row } });
+      } else {
+        await insertFn({ data: { projectId, table: "site_settings", row } });
+      }
+      qc.invalidateQueries({ queryKey: ["pdb", projectId, "site_settings"] });
+      return true;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("admin_gate_")) return false;
+      throw err;
+    }
+  };
+
+  const handleToggleGate = async (enabled: boolean) => {
+    setGateSaving(true);
+    try {
+      const savedToDb = await persistGate({ ...gate, enabled });
+      toast.success(savedToDb ? t("gateToggled") : t("gateSavedLocal"));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t("loadFailed"));
+    } finally {
+      setGateSaving(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (currentPassword !== gate.password) {
+      toast.error(t("gateWrongCurrent"));
+      return;
+    }
+    if (nextPassword.trim().length < 4) {
+      toast.error(t("gatePasswordShort"));
+      return;
+    }
+    if (nextPassword !== confirmPassword) {
+      toast.error(t("gatePasswordMismatch"));
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      const savedToDb = await persistGate({ enabled: gate.enabled, password: nextPassword });
+      setCurrentPassword("");
+      setNextPassword("");
+      setConfirmPassword("");
+      setPasswordFormOpen(false);
+      toast.success(savedToDb ? t("gateUpdated") : t("gateSavedLocal"));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t("loadFailed"));
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -219,6 +300,75 @@ export function EcommerceSettingsPage({ projectId }: { projectId: string }) {
             {t("accentSelected", { label: t(`accent.${selectedPresetId}`) })}
             {livePreset.id !== form.admin_accent_preset ? t("accentSaveToApply") : ""}
           </span>
+        </div>
+      </Card>
+
+      <Card className="border-border/70 p-5">
+        <h2 className="font-display text-xl">{t("gateTitle")}</h2>
+        <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t("gateDesc")}</p>
+        <div className="mt-5 flex items-center gap-3">
+          <span className="text-sm font-medium">{gate.enabled ? t("gateEnabled") : t("gateDisabled")}</span>
+          <Switch
+            checked={gate.enabled}
+            disabled={gateSaving}
+            onCheckedChange={(checked) => void handleToggleGate(checked)}
+            aria-label={t("gateTitle")}
+          />
+        </div>
+        <div className="mt-5">
+          {passwordFormOpen ? (
+            <div className="max-w-sm space-y-3">
+              <Field label={t("gateCurrent")}>
+                <Input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  autoComplete="current-password"
+                  dir="ltr"
+                />
+              </Field>
+              <Field label={t("gateNew")}>
+                <Input
+                  type="password"
+                  value={nextPassword}
+                  onChange={(e) => setNextPassword(e.target.value)}
+                  autoComplete="new-password"
+                  dir="ltr"
+                />
+              </Field>
+              <Field label={t("gateConfirm")}>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                  dir="ltr"
+                />
+              </Field>
+              <div className="flex gap-2 pt-1">
+                <Button type="button" disabled={passwordSaving} onClick={() => void handleUpdatePassword()}>
+                  {passwordSaving ? t("saving") : t("gateUpdate")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={passwordSaving}
+                  onClick={() => {
+                    setPasswordFormOpen(false);
+                    setCurrentPassword("");
+                    setNextPassword("");
+                    setConfirmPassword("");
+                  }}
+                >
+                  {t("cancel")}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button type="button" variant="outline" onClick={() => setPasswordFormOpen(true)}>
+              {t("gateUpdateTitle")}
+            </Button>
+          )}
         </div>
       </Card>
 

@@ -28,14 +28,15 @@ export const ecommerceAdminDict: Record<string, Entry> = {
   },
   mainMetrics: { he: "מדדים עיקריים", ar: "المؤشرات الرئيسية" },
   totalRevenue: { he: "סה״כ הכנסות", ar: "إجمالي الإيرادات" },
-  totalRevenueHint: {
-    he: "הזמנות ששולמו — לא כולל בוטלו",
-    ar: "الطلبات المدفوعة — باستثناء الملغاة",
+  revenueMonth: { he: "הכנסות החודש", ar: "إيرادات هذا الشهر" },
+  revenueMonthHint: {
+    he: "החודש הנוכחי — לא כולל הזמנות שבוטלו",
+    ar: "الشهر الحالي — باستثناء الطلبات الملغاة",
   },
-  totalOrders: { he: "סה״כ הזמנות", ar: "إجمالي الطلبات" },
-  totalOrdersHint: {
-    he: "ששולמו וגלויות בניהול",
-    ar: "المدفوعة والظاهرة في الإدارة",
+  ordersMonth: { he: "הזמנות החודש", ar: "طلبات هذا الشهر" },
+  ordersMonthHint: {
+    he: "החודש הנוכחי — לא כולל הזמנות שבוטלו",
+    ar: "الشهر الحالي — باستثناء الطلبات الملغاة",
   },
   inventoryCustomers: { he: "מלאי ולקוחות", ar: "المخزون والعملاء" },
   products: { he: "מוצרים", ar: "المنتجات" },
@@ -86,8 +87,29 @@ export const ecommerceAdminDict: Record<string, Entry> = {
   // — Settings —
   settingsTitle: { he: "הגדרות", ar: "الإعدادات" },
   settingsSubtitle: {
-    he: "טלפון, משלוחים ועיצוב לוח הניהול של החנות.",
-    ar: "الهاتف والشحن وتصميم لوحة إدارة المتجر.",
+    he: "טלפון, משלוחים, סיסמת ניהול ועיצוב לוח הניהול של החנות.",
+    ar: "الهاتف والشحن وكلمة مرور الإدارة وتصميم لوحة إدارة المتجر.",
+  },
+  gateTitle: { he: "סיסמת ניהול", ar: "كلمة مرور الإدارة" },
+  gateDesc: {
+    he: "כשהסיסמה פעילה, לוח בקרה, דוחות, הגדרות וניהול עובדים נפתחים רק אחרי הזנתה.",
+    ar: "عندما تكون كلمة المرور مفعّلة، تُفتح لوحة التحكم والتقارير والإعدادات وإدارة الموظفين فقط بعد إدخالها.",
+  },
+  gateEnabled: { he: "סיסמה פעילה", ar: "كلمة المرور مفعّلة" },
+  gateDisabled: { he: "סיסמה כבויה", ar: "كلمة المرور معطّلة" },
+  gateUpdateTitle: { he: "עדכון סיסמה", ar: "تحديث كلمة المرور" },
+  gateCurrent: { he: "סיסמה נוכחית", ar: "كلمة المرور الحالية" },
+  gateNew: { he: "סיסמה חדשה", ar: "كلمة المرور الجديدة" },
+  gateConfirm: { he: "אימות סיסמה חדשה", ar: "تأكيد كلمة المرور الجديدة" },
+  gateUpdate: { he: "עדכון", ar: "تحديث" },
+  gateUpdated: { he: "הסיסמה עודכנה", ar: "تم تحديث كلمة المرور" },
+  gateToggled: { he: "הגדרת הסיסמה נשמרה", ar: "تم حفظ إعداد كلمة المرور" },
+  gateWrongCurrent: { he: "הסיסמה הנוכחית שגויה", ar: "كلمة المرور الحالية غير صحيحة" },
+  gatePasswordShort: { he: "הסיסמה החדשה חייבת להכיל 4 תווים לפחות", ar: "يجب أن تحتوي كلمة المرور الجديدة على 4 أحرف على الأقل" },
+  gatePasswordMismatch: { he: "אימות הסיסמה החדשה לא תואם", ar: "تأكيد كلمة المرور الجديدة غير مطابق" },
+  gateSavedLocal: {
+    he: "הסיסמה נשמרה במכשיר זה. כדי שתישמר גם בחנות, הריצו את project-db-migrations/migrations_admin_gate.sql ב-Supabase של חנות הבגדים.",
+    ar: "حُفظت كلمة المرور على هذا الجهاز. لتبقى محفوظة في المتجر، شغّل project-db-migrations/migrations_admin_gate.sql في Supabase لمتجر الملابس.",
   },
   settingsLoadError: {
     he: "לא ניתן לטעון חלק מההגדרות",
@@ -263,6 +285,7 @@ export const ecommerceAdminDict: Record<string, Entry> = {
   docNumber: { he: "מספר מסמך", ar: "رقم المستند" },
   viewInvoice: { he: "צפייה בחשבונית", ar: "عرض الفاتورة" },
   items: { he: "פריטים", ar: "العناصر" },
+  enlargeImage: { he: "הגדלת תמונה", ar: "تكبير الصورة" },
   city: { he: "עיר", ar: "المدينة" },
   street: { he: "רחוב", ar: "الشارع" },
   houseNumber: { he: "מספר בית", ar: "رقم المنزل" },
@@ -422,6 +445,7 @@ export const ecommerceAdminDict: Record<string, Entry> = {
     ar: "نظرة على المبيعات والحالات والعملاء",
   },
   downloadCsv: { he: "הורד CSV", ar: "تنزيل CSV" },
+  sinceOpen: { he: "מאז הפתיחה", ar: "منذ الافتتاح" },
   dateRange: { he: "טווח תאריכים", ar: "نطاق التاريخ" },
   "preset.7": { he: "7 ימים", ar: "7 أيام" },
   "preset.30": { he: "30 ימים", ar: "30 يومًا" },
@@ -575,4 +599,9 @@ export const ecommerceAdminDict: Record<string, Entry> = {
   empAllMonths: { he: "כל החודשים", ar: "جميع الأشهر" },
   error: { he: "שגיאה", ar: "خطأ" },
   confirm: { he: "אישור", ar: "تأكيد" },
+  adminGateTitle: { he: "נדרשת סיסמה", ar: "كلمة المرور مطلوبة" },
+  adminGateBody: {
+    he: "הזן סיסמה כדי לפתוח את {label}",
+    ar: "أدخل كلمة المرور لفتح {label}",
+  },
 };

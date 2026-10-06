@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useEcommerceTheme } from "@/lib/ecommerce/EcommerceThemeContext";
 import { useEcommerceT } from "@/lib/ecommerce/i18n";
+import { readEcommerceAdminGate } from "@/lib/ecommerce/manage-access";
 import {
   projectList,
   projectInsert,
@@ -67,8 +68,6 @@ const DAYS_HE = [
   "empFriday",
   "empSaturday",
 ];
-
-const MANAGE_PASSWORD = "heba11051105"; // will be changed by the user later
 
 /* ---------- helpers ---------- */
 function fmtTime(iso: string | null) {
@@ -290,7 +289,7 @@ export function EcommerceEmployeesPage({ projectId }: { projectId: string }) {
 
   /* ---------- manage auth ---------- */
   const checkPassword = () => {
-    if (managePassword === MANAGE_PASSWORD) {
+    if (managePassword === readEcommerceAdminGate(projectId).password) {
       setManageAuth(true);
       setManagePassword("");
     } else {
@@ -300,7 +299,7 @@ export function EcommerceEmployeesPage({ projectId }: { projectId: string }) {
 
   const openManage = () => {
     setManageOpen(true);
-    setManageAuth(false);
+    setManageAuth(!readEcommerceAdminGate(projectId).enabled);
     setManagePassword("");
     setEditEmp(null);
     setDetailEmp(null);

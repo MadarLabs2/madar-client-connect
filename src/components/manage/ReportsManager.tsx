@@ -22,11 +22,12 @@ import {
   startOfMonth,
   subDays,
 } from "date-fns";
+import { ar, he } from "date-fns/locale";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
-import { projectList, ecommerceOrdersList } from "@/lib/project-db.functions";
+import { projectList, ecommerceReportOrdersList } from "@/lib/project-db.functions";
 import { ECOMMERCE_ORDER_STATUSES } from "@/lib/ecommerce/orders";
 import { cn } from "@/lib/utils";
 import { useEcommerceTheme } from "@/lib/ecommerce/EcommerceThemeContext";
@@ -84,11 +85,11 @@ export function ReportsManager({ projectId }: { projectId: string }) {
   const accent = accentPreset.swatch;
   const chartColors = statusColors(accent);
   const listFn = useServerFn(projectList);
-  const ordersListFn = useServerFn(ecommerceOrdersList);
+  const ordersListFn = useServerFn(ecommerceReportOrdersList);
 
   const { data: ordersRes, isLoading: ordersLoading, error: ordersError } = useQuery({
-    queryKey: ["ecommerce", projectId, "orders", "all"],
-    queryFn: () => ordersListFn({ data: { projectId, limit: 500 } }),
+    queryKey: ["ecommerce", projectId, "orders", "reports"],
+    queryFn: () => ordersListFn({ data: { projectId } }),
   });
   const { data: productsRes, isLoading: productsLoading } = useQuery({
     queryKey: ["pdb", projectId, "products"],
@@ -118,6 +119,13 @@ export function ReportsManager({ projectId }: { projectId: string }) {
     [orders, start, end]
   );
   const nonCancelled = useMemo(() => inRange.filter((o) => o.status !== "cancelled"), [inRange]);
+  const allTimeRevenue = useMemo(
+    () =>
+      orders
+        .filter((o) => o.status !== "cancelled")
+        .reduce((s, o) => s + Number(o.total || 0), 0),
+    [orders],
+  );
 
   const metrics = useMemo(() => {
     const revenue = nonCancelled.reduce((s, o) => s + Number(o.total || 0), 0);
@@ -195,7 +203,8 @@ export function ReportsManager({ projectId }: { projectId: string }) {
   );
   const formatCount = (n: number) => formatEcommerceNumber(n, lang);
 
-  const periodLabel = `${format(start, "d MMM yyyy")} — ${format(end, "d MMM yyyy")}`;
+  const dateLocale = lang === "ar" ? ar : he;
+  const periodLabel = `${format(start, "d MMM yyyy", { locale: dateLocale })} – ${format(end, "d MMM yyyy", { locale: dateLocale })}`;
 
   const handleDownload = useCallback(() => {
     try {
@@ -266,7 +275,6 @@ export function ReportsManager({ projectId }: { projectId: string }) {
           <p className="text-sm text-muted-foreground">{t("reportsSubtitle")}</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">{periodLabel}</span>
           <Button onClick={handleDownload} variant="outline">
             <Download className="ml-1.5 h-4 w-4" />
             {t("downloadCsv")}
@@ -274,8 +282,20 @@ export function ReportsManager({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      <Card className="p-4">
-        <div className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <Card className="p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              {t("totalRevenue")}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("sinceOpen")}</p>
+            <p className="mt-1 text-2xl font-semibold">
+              {ordersLoading ? "…" : money(allTimeRevenue)}
+            </p>
+          </div>
+          <p className="text-sm text-muted-foreground">{periodLabel}</p>
+        </div>
+        <div className="mb-3 mt-5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {t("dateRange")}
         </div>
         <div className="flex flex-wrap gap-2">

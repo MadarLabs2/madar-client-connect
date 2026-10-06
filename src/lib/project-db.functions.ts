@@ -235,6 +235,23 @@ export const ecommerceOrdersList = createServerFn({ method: "POST" })
     };
   });
 
+export const ecommerceReportOrdersList = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ projectId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const admin = await isAdmin(context.userId);
+    const client = await getProjectClient(data.projectId, context.userId, admin);
+    const { data: rows, error } = await client
+      .from("orders")
+      .select(ECOMMERCE_ORDER_LIST_COLUMNS)
+      .eq("payment_status", "paid")
+      .is("hidden_from_admin_at", null)
+      .order("created_at", { ascending: false })
+      .limit(20000);
+    if (error) return { rows: [], error: error.message };
+    return { rows: rows ?? [], error: null };
+  });
+
 export const ecommerceOrderDetails = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>

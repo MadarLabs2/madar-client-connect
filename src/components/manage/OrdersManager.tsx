@@ -143,6 +143,7 @@ export function OrdersManager({
   const [hiding, setHiding] = useState(false);
   const [orderPendingHide, setOrderPendingHide] = useState<AdminOrderRow | null>(null);
   const [unseenOrderIds, setUnseenOrderIds] = useState<Set<string>>(() => new Set());
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
   const ordersInitializedRef = useRef(false);
@@ -749,12 +750,21 @@ export function OrdersManager({
                     <div key={it.id} className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
                       <div className="flex min-w-0 items-center gap-3">
                         {it.image_url ? (
-                          <img
-                            src={it.image_url}
-                            alt=""
-                            className="h-12 w-10 shrink-0 object-cover"
-                            loading="lazy"
-                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPreviewImage({ url: it.image_url as string, name: it.product_name })
+                            }
+                            className="shrink-0 overflow-hidden rounded-md ring-offset-background transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            aria-label={t("enlargeImage")}
+                          >
+                            <img
+                              src={it.image_url}
+                              alt={it.product_name}
+                              className="h-12 w-10 cursor-zoom-in object-cover"
+                              loading="lazy"
+                            />
+                          </button>
                         ) : null}
                         <ColorSwatch hex={it.color_hex} label={it.color} />
                         <span className="min-w-0">
@@ -776,6 +786,24 @@ export function OrdersManager({
               {t("close")}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={previewImage != null} onOpenChange={(open) => { if (!open) setPreviewImage(null); }}>
+        <DialogContent
+          overlayClassName="z-[80] bg-black/80"
+          className="z-[80] max-h-[90vh] max-w-3xl gap-3 overflow-hidden border-border/70 bg-background p-4 sm:p-5"
+        >
+          <DialogHeader className="text-start">
+            <DialogTitle className="text-base font-medium">{previewImage?.name}</DialogTitle>
+          </DialogHeader>
+          {previewImage ? (
+            <img
+              src={previewImage.url}
+              alt={previewImage.name}
+              className="max-h-[75vh] w-full rounded-md object-contain"
+            />
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>
